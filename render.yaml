@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: carlos-cv-agent
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt -c constraints.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.14"
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: LLM_MODEL
+        value: gemini-3.5-flash-lite
+      - key: KNOWLEDGE_MODE
+        value: full
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AGENT_API_KEY
+        generateValue: true
