@@ -21,13 +21,17 @@ jobs:
       - name: Prueba de humo del contenedor (proveedor mock, usuario sin privilegios)
         run: |
           docker run -d --name cv -p 8080:8080 -e LLM_PROVIDER=mock -e AGENT_API_KEY=ci-key cv-agent:ci
-          for i in $(seq 1 20); do curl -fsS localhost:8080/health && break; sleep 1; done
-          test "$(docker exec cv id -u)" = "10001"
-          curl -fsS localhost:8080/.well-known/agent-card.json | grep -q '"streaming": *true'
+          for i in $(seq 1 30); do curl -fsS localhost:8080/health && break; sleep 1; done
+          echo; echo "uid: $(docker exec cv id -u)"; test "$(docker exec cv id -u)" = "10001"
+          card=$(curl -fsS localhost:8080/.well-known/agent-card.json)
+          echo "$card" | python3 -c 'import json,sys; c=json.load(sys.stdin); assert c["capabilities"]["streaming"] is True, c'
           code=$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/v1/responses -H 'Content-Type: application/json' -d '{"input":"hola"}')
-          test "$code" = "401"
-          curl -fsS localhost:8080/v1/responses -H 'Authorization: Bearer ci-key' -H 'Content-Type: application/json' \
-            -d '{"input":"¿Qué haces actualmente?","reasoning":{"effort":"medium"}}' | grep -q '"status": *"completed"'
-          docker logs cv | grep -q '"severity"'
+          echo "sin clave: $code"; test "$code" = "401"
+          resp=$(curl -fsS localhost:8080/v1/responses -H 'Authorization: Bearer ci-key' -H 'Content-Type: application/json' \
+            -d '{"input":"¿Qué haces actualmente?","reasoning":{"effort":"medium"}}')
+          echo "$resp" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["status"]=="completed", r; print("respuesta:", r["status"])'
+          logs=$(docker logs cv 2>&1)
+          echo "$logs" | tail -5
+          case "$logs" in *'"severity"'*) echo "logs JSON ok";; *) echo "faltan logs JSON"; exit 1;; esac
       - if: always()
         run: docker rm -f cv || true
