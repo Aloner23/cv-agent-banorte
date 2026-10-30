@@ -95,7 +95,8 @@ def test_invalid_judge_scores_are_rejected(value):
 
 def test_judge_scores_affect_pass_and_format_prompt():
     judgment = {"grounded": 2, "helpful": 5, "issues": "inventa certificación"}
-    result = asyncio.run(judge(Deltas([json.dumps(judgment)]), "¿Tiene PMP?", "Sí.", "No documentado", "No inventar"))
+    conversation = [{"role": "user", "text": "¿Tiene PMP?"}, {"role": "assistant", "text": "Sí."}]
+    result = asyncio.run(judge(Deltas([json.dumps(judgment)]), conversation, "No documentado", "No inventar"))
     assert result == judgment
     assert judge_failures(result) == ["juez: fidelidad inferior a 5/5"]
 

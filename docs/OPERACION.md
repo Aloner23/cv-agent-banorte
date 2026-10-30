@@ -23,11 +23,11 @@ El navegador requiere el servidor; abrir `web/index.html` como archivo no conect
 
 ## 2. Crear el repositorio público
 
-Nombre sugerido: `carlos-cv-agent`. Publicar el contenido de esta carpeta, no su carpeta superior: el PDF original contiene un teléfono y no forma parte del repositorio. `.env*`, entornos virtuales, logs, reportes locales y temporales están excluidos mediante `.gitignore`.
+Repositorio: [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte). Publicar el contenido de esta carpeta, no su carpeta superior: el PDF original contiene un teléfono y no forma parte del repositorio. `.env*`, entornos virtuales, logs, reportes locales y temporales están excluidos mediante `.gitignore`.
 
 Confirmar los archivos que se incluirán antes del primer push. No incluir claves, conversaciones privadas ni el PDF original. Las capturas de `docs/images/` muestran la interfaz con contenido profesional curado y estado de demostración.
 
-La conexión de GitHub permite trabajar con repositorios existentes, pero la creación requiere una sesión web o la herramienta de línea de comandos autenticada. Una vez creado, registrar la URL real aquí y en el material de entrega; no usar un enlace supuesto como si existiera.
+El repositorio se creó en la cuenta del titular. La publicación del código y la disponibilidad del endpoint HTTPS son verificaciones independientes.
 
 ## 3. Desplegar en Render
 
@@ -59,7 +59,7 @@ python -m dotenv -f .env run -- python -m evals.run_evals --url https://TU-SERVI
 
 `--judge` además requiere una clave local de proveedor y el mismo corpus que el endpoint. Ejecutarlo implica llamadas adicionales facturables. Los reportes se guardan en `evals/results/`, fuera de Git por defecto. Revisar contenido antes de compartir un reporte.
 
-Los 34 casos más varios turnos pueden superar 30 solicitudes en un minuto. El evaluador respeta un intervalo entre solicitudes para no inducir un fallo por su propia carga; si se ajusta el límite, debe documentarse en el reporte. Las latencias miden solicitudes, no incluyen la pausa deliberada. No inflar el límite público para ocultar una prueba fallida.
+Los 34 casos más varios turnos pueden superar 30 solicitudes en un minuto. El evaluador deja por defecto 6.1 segundos entre inicios de llamadas al agente y al juez, compartiendo la misma pausa para respetar la cuota del proveedor; si se ajusta el límite, debe documentarse en el reporte. Las latencias miden solicitudes, no incluyen la pausa deliberada. No inflar el límite público para ocultar una prueba fallida.
 
 Revisar manualmente los casos de títulos no documentados, NPS, costo histórico y ahorro neto, y los de inyección. No aceptar sólo un porcentaje agregado. Comparar con `retrieval` únicamente como experimento explícito, registrando ambos modos.
 
@@ -82,6 +82,7 @@ La revisión inicial sólo alcanzó la pantalla de inicio de sesión; no se cono
 | `/ready` devuelve 503 | Falta credencial/corpus o modo mock | Corregir configuración; no declarar servicio listo |
 | 401 del agente | Clave de acceso incorrecta o ausente | Revisar `AGENT_API_KEY`, sin mostrarla |
 | 429 del agente | Límite local de solicitudes | Esperar `Retry-After`; revisar proxy y uso |
+| 503 con `provider_rate_limit` | Gemini limitó solicitudes o agotó cuota | Respetar `Retry-After`; si persiste, revisar cuota de la cuenta |
 | 502 con código de proveedor | Error, filtrado, respuesta vacía o stream inválido | Revisar estado, acceso al modelo y cuota; no cambiar silenciosamente de proveedor |
 | 504 o error de tiempo en SSE | Se agotó el tiempo total | Revisar latencia y capacidad antes de ampliar timeout |
 | `response.incomplete` | Se alcanzó presupuesto de salida | Pedir una pregunta más acotada o continuar |

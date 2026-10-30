@@ -14,8 +14,9 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 | Base de conocimiento | Seis documentos cotejados con el CV aportado; no verificación externa de logros |
 | Pruebas de servidor y proveedor | Sin red, con respuestas controladas; ver [VALIDACION.md](docs/VALIDACION.md) |
 | Modelo | Gemini configurable; predeterminado `gemini-3.5-flash-lite` |
-| Calidad con Gemini real | Pendiente de configurar credencial y ejecutar evaluación |
-| GitHub público, HTTPS y registro en Banorte | Pendientes; este README no acredita publicación |
+| Calidad con Gemini real | Conexión comprobada; evaluación y revisión en curso |
+| Código público | [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte) |
+| HTTPS y registro en Banorte | Pendientes de despliegue e integración |
 
 ## Lectura para el evaluador
 
@@ -134,4 +135,4 @@ Hay 34 casos: hechos, síntesis, varios turnos, información ausente, privacidad
 
 ## Publicar
 
-[render.yaml](render.yaml) define una instancia de demostración con Gemini explícito y una clave de acceso autogenerada. `constraints.txt` fija las versiones verificadas de dependencias. El despliegue permanece pendiente hasta tener repositorio público, cuenta de alojamiento y credencial configurada. Los pasos y la comprobación de aceptación están en [OPERACION.md](docs/OPERACION.md).
+[render.yaml](render.yaml) define una instancia de demostración con Gemini explícito y una clave de acceso autogenerada. `constraints.txt` fija las versiones verificadas de dependencias. El repositorio público está creado; el despliegue permanece pendiente de configurar y comprobar el alojamiento. Los pasos y la comprobación de aceptación están en [OPERACION.md](docs/OPERACION.md).

@@ -32,6 +32,28 @@ def events(raw):
             if line.startswith("data: ") and line != "data: [DONE]"]
 
 
+@pytest.mark.parametrize('stream', [False, True])
+def test_upstream_quota_is_distinct_and_never_reported_completed(api, monkeypatch, stream):
+    client, main = api
+
+    async def limited(*args, **kwargs):
+        raise ProviderError('private-secret', 'provider_rate_limit', retry_after=37)
+        yield ''
+
+    monkeypatch.setattr(main.agent, 'stream', limited)
+    response = client.post('/v1/responses', json={'input': 'hola', 'stream': stream}, headers=H)
+    assert 'private-secret' not in response.text
+    if stream:
+        payloads = events(response.text)
+        failed = next(p for p in payloads if p['type'] == 'response.failed')
+        assert failed['response']['error']['code'] == 'provider_rate_limit'
+        assert not any(p['type'] == 'response.completed' for p in payloads)
+        assert response.text.endswith('data: [DONE]\n\n')
+    else:
+        assert response.status_code == 503 and response.headers['Retry-After'] == '37'
+        assert response.json()['error']['code'] == 'provider_rate_limit'
+
+
 @pytest.mark.parametrize("payload,param", [
     ({"input": "hola", "previous_response_id": []}, "previous_response_id"),
     ({"input": "hola", "instructions": {}}, "instructions"),

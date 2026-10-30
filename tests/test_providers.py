@@ -148,3 +148,31 @@ def test_current_model_does_not_receive_legacy_thinking_budget(monkeypatch):
         return httpx.Response(200, text=sse(candidate()))
 
     assert asyncio.run(collect(GeminiProvider('test-key', 'gemini-3.5-flash-lite', httpx.MockTransport(handler))))
+
+
+@pytest.mark.parametrize('header,expected', [('37', 37), (None, 60), ('private-secret', 60), ('999999', 86400)])
+def test_quota_is_not_retried_and_retry_after_is_safe(header, expected):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(429, headers={'Retry-After': header} if header else {}, text='private-secret')
+
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(collect(GeminiProvider('test-key', 'gemini-3.5-flash-lite', httpx.MockTransport(handler))))
+    assert len(calls) == 1
+    assert exc.value.code == 'provider_rate_limit' and exc.value.retry_after == expected
+    assert 'private-secret' not in str(exc.value)
+
+
+def test_quota_event_after_partial_text_stops_without_retry():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, text=sse(candidate('partial', None),
+            {'error': {'code': 429, 'message': 'private-secret'}}))
+
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(collect(GeminiProvider('test-key', 'gemini-3.5-flash-lite', httpx.MockTransport(handler))))
+    assert len(calls) == 1 and exc.value.code == 'provider_rate_limit'

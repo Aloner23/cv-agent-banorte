@@ -26,7 +26,7 @@ from .openresponses import (
     response_obj,
     validate_body,
 )
-from .providers import ProviderError
+from .providers import DEFAULT_QUOTA_RETRY_SECONDS, ProviderError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("cv-agent")
@@ -238,6 +238,12 @@ async def create_response(request: Request):
             return JSONResponse(error_body("El modelo tardó demasiado, intenta de nuevo", "model_error", "gateway_timeout"), status_code=504)
         except ProviderError as e:
             log.warning("provider failure id=%s code=%s", resp_id, getattr(e, "code", "model_error"))
+            if e.code == "provider_rate_limit":
+                retry_after = e.retry_after or DEFAULT_QUOTA_RETRY_SECONDS
+                return JSONResponse(error_body(
+                    f"El proveedor limitó las solicitudes. Intenta de nuevo en {retry_after} segundos; si persiste, revisa la cuota.",
+                    "model_error", "provider_rate_limit"), status_code=503,
+                    headers={"Retry-After": str(retry_after)})
             return JSONResponse(error_body("El modelo no respondió, intenta de nuevo", "model_error", getattr(e, "code", "model_error")), status_code=502)
         return finish(text, usage)
 
@@ -259,6 +265,9 @@ async def create_response(request: Request):
             code = "gateway_timeout" if isinstance(e, TimeoutError) else getattr(e, "code", "server_error")
             log.warning("stream failure id=%s code=%s exception=%s", resp_id, code, type(e).__name__)
             message = "El modelo tardó demasiado" if isinstance(e, TimeoutError) else "No fue posible completar la respuesta"
+            if code == "provider_rate_limit":
+                retry_after = getattr(e, "retry_after", None) or DEFAULT_QUOTA_RETRY_SECONDS
+                message = f"El proveedor limitó las solicitudes. Intenta de nuevo en {retry_after} segundos; si persiste, revisa la cuota."
             failed = response_obj(**common, status="failed", output=[message_item(msg_id, text, "incomplete")] if text else [],
                                   usage=usage, error={"code": code, "message": message})
             yield sse("error", code=code, message=message, param=None)

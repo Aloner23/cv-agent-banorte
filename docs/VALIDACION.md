@@ -6,7 +6,7 @@ Revisión: **30 de octubre de 2026**, entorno local de Carlos. Python 3.12.14. D
 
 | Verificación | Resultado | Alcance |
 |---|---|---|
-| Suite `pytest` | **85 pruebas aprobadas** | Servidor, contrato textual, memoria, privacidad numérica, errores y adaptador Gemini con HTTP simulado |
+| Suite `pytest` | **98 pruebas aprobadas** | Servidor, contrato textual, memoria, privacidad numérica, errores y adaptador Gemini con HTTP simulado |
 | Prueba HTTP del servicio en marcha | **3/3 casos técnicos aprobados** | Rol, formación y dos turnos; proveedor `mock` |
 | Navegador de escritorio | Verificado | Envío, recepción SSE, referencia visual a una sección y nueva conversación |
 | Vista móvil 390 px | Verificada | Sin desbordamiento horizontal; composición y lectura del chat |
@@ -26,7 +26,13 @@ python -m evals.run_evals --url http://127.0.0.1:8000 --mode mock-smoke
 python -m pip check
 ```
 
-La prueba técnica de esta sesión usó el puerto local 8800 y `--interval 0.1` para un lote de sólo cuatro solicitudes. La evaluación completa usa por defecto 2.1 segundos entre inicios de solicitudes para respetar el límite público. El reporte local más reciente está en `evals/results/latest.md` y se identifica como **prueba técnica mock; no evalúa calidad del modelo**.
+La prueba técnica de esta sesión usó el puerto local 8800 y `--interval 0.1` para un lote de sólo cuatro solicitudes. La evaluación completa deja ahora 6.1 segundos entre inicios de llamadas, tanto al agente como al juez. La primera ejecución real utilizó una pausa insuficiente y encontró HTTP 429 del proveedor. Los reportes locales están en `evals/results/`; el modo y el modelo se identifican en cada uno.
+
+## Primera conexión y hallazgos reales
+
+Se comprobó una respuesta autenticada de `gemini-3.5-flash-lite`, en modo `full`. El primer lote del 30 de octubre registró 23 de 34 casos aprobados por reglas y juez; 11 quedaron sin completar en el agente o el juez durante los límites de cuota. No es una medición completa de calidad ni debe presentarse como 34 casos aprobados.
+
+La revisión encontró además referencias mal formadas y negaciones demasiado absolutas ante datos ausentes. Se reforzó el prompt. El evaluador conserva ahora todas las respuestas de conversaciones, distingue errores de servicio y deja pendientes las rúbricas sin juez. Estos cambios requieren una nueva ejecución; el resultado anterior no se traslada a la versión corregida.
 
 ## Qué cubren las pruebas añadidas
 
@@ -42,8 +48,8 @@ La prueba técnica de esta sesión usó el puerto local 8800 y `--interval 0.1` 
 
 ## Lo que todavía NO se ha demostrado
 
-1. Calidad, fidelidad o latencia de **Gemini real**. No se ejecutaron llamadas al proveedor porque falta una clave configurada.
-2. Resultado de la suite semántica de **34 casos**: quedó preparada, no se afirma que esté aprobada.
+1. Aprobación completa de calidad: Gemini real ya respondió, pero la primera ejecución dejó 11 de 34 evaluaciones incompletas por errores de servicio.
+2. Evaluación repetida con pausa compartida, transcripción completa y revisión de todos los casos: en curso.
 3. Disponibilidad HTTPS, credencial y cuota en una cuenta de alojamiento.
 4. Compatibilidad con el cliente exacto de Banorte: requiere registro y conversación dentro de su plataforma.
 5. Conformidad completa con toda la especificación Open Responses o con todos los SDKs.

@@ -10,7 +10,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import TYPE_CHECKING, AsyncIterator, Protocol
 
 import httpx
@@ -22,15 +25,34 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("cv-agent")
 TIMEOUT = httpx.Timeout(60.0, connect=10.0)
-RETRY_STATUS = {429, 500, 502, 503, 504, 529}
+RETRY_STATUS = {500, 502, 503, 504, 529}
+DEFAULT_QUOTA_RETRY_SECONDS = 60
 
 
 class ProviderError(RuntimeError):
     """Error seguro para logs: nunca contiene cuerpos, prompts ni claves del proveedor."""
 
-    def __init__(self, message: str, code: str = "model_error"):
+    def __init__(self, message: str, code: str = "model_error", *, retry_after: int | None = None):
         super().__init__(message)
         self.code = code
+        self.retry_after = retry_after
+
+
+def _retry_after_seconds(value: str | None) -> int:
+    """Normaliza Retry-After sin reflejar texto arbitrario del proveedor."""
+    if not value or len(value) > 128:
+        return DEFAULT_QUOTA_RETRY_SECONDS
+    value = value.strip()
+    if value.isascii() and value.isdigit():
+        return max(1, min(86400, int(value)))
+    try:
+        deadline = parsedate_to_datetime(value)
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        seconds = math.ceil((deadline - datetime.now(timezone.utc)).total_seconds())
+        return max(1, min(86400, seconds))
+    except (ValueError, TypeError, OverflowError):
+        return DEFAULT_QUOTA_RETRY_SECONDS
 
 
 class Provider(Protocol):
@@ -42,12 +64,16 @@ class Provider(Protocol):
 async def _sse_lines(client: httpx.AsyncClient, method: str, url: str, **kw) -> AsyncIterator[dict]:
     """Parsea eventos SSE completos; reintenta HTTP transitorio antes de emitir texto.
 
-    No reintenta errores de transporte tras abrir la solicitud: una repetición podría
-    duplicar una generación facturada o texto que el usuario ya recibió.
+    No reintenta cuota agotada: devuelve la espera al cliente sin sumar solicitudes.
+    Tampoco reintenta errores de transporte tras abrir la solicitud: una repetición
+    podría duplicar una generación facturada o texto que el usuario ya recibió.
     """
     try:
         for attempt in range(3):
             async with client.stream(method, url, **kw) as r:
+                if r.status_code == 429:
+                    raise ProviderError("El proveedor limitó las solicitudes", "provider_rate_limit",
+                                        retry_after=_retry_after_seconds(r.headers.get("Retry-After")))
                 if r.status_code in RETRY_STATUS and attempt < 2:
                     await asyncio.sleep(0.8 * 2**attempt)
                     continue
@@ -87,6 +113,10 @@ def _parse_event(raw: str) -> dict:
     if not isinstance(event, dict):
         raise ProviderError("El proveedor devolvió un evento inválido", "provider_protocol_error")
     if event.get("error"):
+        error = event["error"]
+        if isinstance(error, dict) and (error.get("code") == 429 or error.get("status") == "RESOURCE_EXHAUSTED"):
+            raise ProviderError("El proveedor limitó las solicitudes", "provider_rate_limit",
+                                retry_after=DEFAULT_QUOTA_RETRY_SECONDS)
         raise ProviderError("El proveedor reportó un error", "provider_generation_error")
     return event
 
