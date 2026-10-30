@@ -17,6 +17,12 @@ services:
         value: gemini-3.5-flash-lite
       - key: KNOWLEDGE_MODE
         value: full
+      - key: MAX_HISTORY_TURNS
+        value: "30"
+      - key: MAX_HISTORY_CHARS
+        value: "40000"
+      - key: PUBLIC_BASE_URL
+        value: https://carlos-cv-agent.onrender.com
       - key: GEMINI_API_KEY
         sync: false
       - key: AGENT_API_KEY

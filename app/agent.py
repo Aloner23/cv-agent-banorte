@@ -98,6 +98,7 @@ class AgentRequest:
     client_instructions: str | None = None
     max_output_tokens: int | None = None
     temperature: float | None = None
+    truncation: str = "disabled"
     flags: list[str] = field(default_factory=list)
 
 
@@ -123,9 +124,21 @@ class CVAgent:
             raise InputError("La conversación debe terminar con un mensaje del usuario con texto.")
         if any(t.role == "user" and len(t.text) > self.settings.max_input_chars for t in req.turns):
             raise InputError(f"El mensaje excede {self.settings.max_input_chars} caracteres.")
-        # No eliminar contexto silenciosamente: el contrato usa truncation=disabled.
-        if (len(req.turns) > self.settings.max_history_turns * 2 + 1
-                or sum(len(t.text) for t in req.turns) > self.settings.max_history_chars):
+        max_turns = self.settings.max_history_turns * 2 + 1
+
+        def over_limit() -> bool:
+            return len(req.turns) > max_turns or sum(len(t.text) for t in req.turns) > self.settings.max_history_chars
+
+        if over_limit() and req.truncation == "auto":
+            # El cliente aceptó explícitamente perder contexto antiguo: se descartan
+            # los turnos más viejos, conservando que el historial empiece con el usuario.
+            while over_limit() and len(req.turns) > 1:
+                req.turns.pop(0)
+                while len(req.turns) > 1 and req.turns[0].role != "user":
+                    req.turns.pop(0)
+            req.flags.append("history_truncated")
+        # Con truncation=disabled (valor por defecto) no se elimina contexto en silencio.
+        if over_limit():
             raise InputError("La conversación excede el límite de historial. Inicia una nueva conversación.")
         if INJECTION_PATTERNS.search(req.turns[-1].text):
             req.flags.append("possible_prompt_injection")

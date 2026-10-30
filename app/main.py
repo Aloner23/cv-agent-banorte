@@ -14,11 +14,13 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .agent import CVAgent, InputError, Turn
 from .config import ROOT, get_settings
+from .observability import Metrics, configure_logging, new_request_context
 from .openresponses import (
     SSE,
     InvalidRequest,
     ResponseStore,
     error_body,
+    ignored_params,
     message_item,
     new_id,
     output_text_part,
@@ -28,15 +30,17 @@ from .openresponses import (
 )
 from .providers import DEFAULT_QUOTA_RETRY_SECONDS, ProviderError
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+configure_logging()
 log = logging.getLogger("cv-agent")
 
 settings = get_settings()
 agent = CVAgent(settings)
 store = ResponseStore(settings.response_store_max_items, settings.response_store_ttl_seconds)
+metrics = Metrics()
 _hits: OrderedDict[str, deque] = OrderedDict()
 
-app = FastAPI(title="Carlos Alonso · CV Agent", version="1.0.0", docs_url="/docs")
+APP_VERSION = "1.1.0"
+app = FastAPI(title="Carlos Alonso · CV Agent", version=APP_VERSION, docs_url="/docs")
 if settings.cors_origins:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
                        allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "X-API-Key"])
@@ -44,7 +48,16 @@ if settings.cors_origins:
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    rid = new_request_context(request.headers)
+    t0 = time.perf_counter()
     response = await call_next(request)
+    route = getattr(request.scope.get("route"), "path", None) or "unmatched"
+    metrics.record_http(request.method, route, response.status_code)
+    if route not in ("/health", "/ready"):  # los health checks del hosting solo generarían ruido
+        log.info("http_request", extra={"fields": {"httpRequest": {
+            "requestMethod": request.method, "requestUrl": route, "status": response.status_code,
+            "latency": f"{time.perf_counter() - t0:.3f}s"}}})
+    response.headers["X-Request-ID"] = rid
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["X-Frame-Options"] = "DENY"
@@ -146,6 +159,73 @@ def models(request: Request):
     return {"object": "list", "data": [{"id": settings.public_model_name, "object": "model", "owned_by": "carlos-alonso"}]}
 
 
+@app.get("/metrics")
+def get_metrics(request: Request):
+    """Métricas operativas de esta instancia (protegidas con la misma clave del agente)."""
+    if (err := _check_auth(request)):
+        return err
+    return {"service": settings.public_model_name, "version": APP_VERSION,
+            "provider": agent.provider_name, "model": agent.model,
+            "knowledge_revision": getattr(agent.kb, "revision", None), **metrics.snapshot()}
+
+
+def _public_base_url(request: Request) -> str:
+    if settings.public_base_url:
+        return settings.public_base_url.rstrip("/")
+    # Detrás de Render/Cloud Run el esquema real llega en X-Forwarded-Proto (uvicorn --proxy-headers).
+    return str(request.base_url).rstrip("/")
+
+
+@app.get("/.well-known/agent-card.json")
+def agent_card(request: Request):
+    """Tarjeta de agente A2A: describe al agente y dónde está su endpoint Open Responses."""
+    base = _public_base_url(request)
+    responses_base = f"{base}/v1"
+    return {
+        "protocolVersion": "0.3.0",
+        "name": "Carlos Alonso · Agente de CV",
+        "description": ("Conversa sobre la trayectoria, experiencia, proyectos de IA y habilidades de "
+                        "Carlos Ignacio Alonso Reyes, con respuestas basadas en su CV y referencias a las fuentes."),
+        "url": responses_base,
+        "preferredTransport": "HTTP+JSON",
+        "additionalInterfaces": [{"url": responses_base, "transport": "HTTP+JSON"}],
+        "version": APP_VERSION,
+        "documentationUrl": "https://github.com/Aloner23/cv-agent-banorte",
+        "provider": {"organization": "Carlos Ignacio Alonso Reyes", "url": "https://github.com/Aloner23"},
+        "capabilities": {
+            "streaming": True,
+            "pushNotifications": False,
+            "stateTransitionHistory": False,
+            "extensions": [{
+                "uri": "https://www.openresponses.org/specification",
+                "description": "Endpoint compatible con Open Responses: POST {url}/responses (con y sin SSE).",
+                "required": False,
+                "params": {"base_url": responses_base, "endpoint": f"{responses_base}/responses",
+                           "model": settings.public_model_name,
+                           "conversation_state": ["transcript_replay", "previous_response_id"]},
+            }],
+        },
+        "securitySchemes": {"bearer": {"type": "http", "scheme": "bearer",
+                                       "description": "Authorization: Bearer <AGENT_API_KEY>"}},
+        "security": [{"bearer": []}] if settings.agent_api_key else [],
+        "defaultInputModes": ["text/plain"],
+        "defaultOutputModes": ["text/plain"],
+        "skills": [{
+            "id": "cv-qa",
+            "name": "Preguntas sobre el CV",
+            "description": "Responde sobre perfil, experiencia, proyectos, habilidades, formación y liderazgo, "
+                           "sin inventar datos que no estén en el CV.",
+            "tags": ["cv", "carrera", "ia", "banca"],
+            "examples": [
+                "¿Quién eres y cuál es tu perfil profesional?",
+                "¿Qué proyectos de IA has construido y qué impacto tuvieron?",
+                "¿Qué experiencia tienes liderando equipos?",
+                "¿Cuáles son tus principales habilidades técnicas?",
+            ],
+        }],
+    }
+
+
 @app.get("/v1/responses/{resp_id}")
 async def get_response(resp_id: str, request: Request):
     if (err := _check_auth(request)):
@@ -174,6 +254,12 @@ async def create_response(request: Request):
         return JSONResponse(error_body("JSON inválido"), status_code=400)
     except InvalidRequest as e:
         return JSONResponse(error_body(str(e), code=e.code, param=e.param), status_code=400)
+
+    if (skipped := ignored_params(body)):
+        for name in skipped:
+            metrics.ignored_params[name] += 1
+        log.info("ignored_params", extra={"fields": {"params": skipped}})
+        body = {k: v for k, v in body.items() if k not in skipped}
 
     if body.get("model") not in (None, settings.public_model_name):
         return JSONResponse(error_body("Modelo no encontrado; consulta /v1/models", code="model_not_found", param="model"), status_code=400)
@@ -210,7 +296,12 @@ async def create_response(request: Request):
     common = dict(resp_id=resp_id, created_at=created, model=model_name, body=body)
     t0 = time.perf_counter()
 
-    def finish(text: str, usage: dict) -> dict:
+    def fail(code: str) -> None:
+        metrics.record_error(code)
+        log.warning("response_failed", extra={"fields": {
+            "response_id": resp_id, "error_code": code, "ms": int((time.perf_counter() - t0) * 1000)}})
+
+    def finish(text: str, usage: dict, ttft_ms: float | None = None) -> dict:
         reason = usage.get("finish_reason")
         incomplete = reason in ("max_output_tokens", "content_filter")
         status = "incomplete" if incomplete else "completed"
@@ -219,10 +310,15 @@ async def create_response(request: Request):
                              incomplete_details={"reason": reason} if incomplete else None)
         if body.get("store", True) is not False:
             store.put(resp_id, req.turns + [Turn("assistant", text)], final)
-        log.info(json.dumps({"event": "response", "id": resp_id, "ms": int((time.perf_counter() - t0) * 1000),
-                             "in_tok": usage.get("input_tokens"), "out_tok": usage.get("output_tokens"),
-                             "flags": req.flags, "turns": len(req.turns), "status": status,
-                             "knowledge_revision": getattr(agent.kb, "revision", None)}))
+        ms = (time.perf_counter() - t0) * 1000
+        metrics.record_response(status, ms, usage, req.flags, ttft_ms)
+        log.info("response", extra={"fields": {
+            "response_id": resp_id, "status": status, "ms": int(ms),
+            "ttft_ms": None if ttft_ms is None else int(ttft_ms), "stream": bool(body.get("stream")),
+            "input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens"),
+            "flags": req.flags, "turns": len(req.turns), "finish_reason": usage.get("finish_reason"),
+            "provider": agent.provider_name, "model": agent.model,
+            "knowledge_revision": getattr(agent.kb, "revision", None)}})
         return final
 
     # ---------------- no streaming
@@ -234,10 +330,10 @@ async def create_response(request: Request):
             if not text.strip() and usage.get("finish_reason") not in ("max_output_tokens", "content_filter"):
                 raise ProviderError("Empty provider response")
         except TimeoutError:
-            log.warning("response timeout id=%s", resp_id)
+            fail("gateway_timeout")
             return JSONResponse(error_body("El modelo tardó demasiado, intenta de nuevo", "model_error", "gateway_timeout"), status_code=504)
         except ProviderError as e:
-            log.warning("provider failure id=%s code=%s", resp_id, getattr(e, "code", "model_error"))
+            fail(getattr(e, "code", None) or "model_error")
             if e.code == "provider_rate_limit":
                 retry_after = e.retry_after or DEFAULT_QUOTA_RETRY_SECONDS
                 return JSONResponse(error_body(
@@ -249,7 +345,7 @@ async def create_response(request: Request):
 
     # ---------------- streaming SSE
     async def events():
-        sse, usage, text = SSE(), {}, ""
+        sse, usage, text, ttft = SSE(), {}, "", None
         yield sse("response.created", response=response_obj(**common, status="in_progress", output=[]))
         yield sse("response.in_progress", response=response_obj(**common, status="in_progress", output=[]))
         yield sse("response.output_item.added", output_index=0, item=message_item(msg_id, "", "in_progress"))
@@ -257,13 +353,16 @@ async def create_response(request: Request):
         try:
             async with asyncio.timeout(settings.request_timeout_seconds):
                 async for delta in agent.stream(req, usage):
+                    if ttft is None and delta:
+                        ttft = (time.perf_counter() - t0) * 1000
                     text += delta
                     yield sse("response.output_text.delta", item_id=msg_id, output_index=0, content_index=0, delta=delta, logprobs=[])
             if not text.strip() and usage.get("finish_reason") not in ("max_output_tokens", "content_filter"):
                 raise ProviderError("Empty provider response")
         except Exception as e:  # noqa: BLE001 — cualquier fallo debe cerrar el stream con response.failed
             code = "gateway_timeout" if isinstance(e, TimeoutError) else getattr(e, "code", "server_error")
-            log.warning("stream failure id=%s code=%s exception=%s", resp_id, code, type(e).__name__)
+            fail(code)
+            log.warning("stream_failure", extra={"fields": {"response_id": resp_id, "exception": type(e).__name__}})
             message = "El modelo tardó demasiado" if isinstance(e, TimeoutError) else "No fue posible completar la respuesta"
             if code == "provider_rate_limit":
                 retry_after = getattr(e, "retry_after", None) or DEFAULT_QUOTA_RETRY_SECONDS
@@ -274,7 +373,7 @@ async def create_response(request: Request):
             yield sse("response.failed", response=failed)
             yield "data: [DONE]\n\n"
             return
-        final = finish(text, usage)
+        final = finish(text, usage, ttft)
         yield sse("response.output_text.done", item_id=msg_id, output_index=0, content_index=0, text=text, logprobs=[])
         yield sse("response.content_part.done", item_id=msg_id, output_index=0, content_index=0, part=output_text_part(text))
         yield sse("response.output_item.done", output_index=0, item=final["output"][0])

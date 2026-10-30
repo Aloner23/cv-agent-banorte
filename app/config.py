@@ -41,6 +41,8 @@ class Settings:
     knowledge_dir: Path = field(default_factory=lambda: Path(_env("KNOWLEDGE_DIR", str(ROOT / "knowledge"))))
 
     public_model_name: str = field(default_factory=lambda: _env("PUBLIC_MODEL_NAME", "carlos-cv-agent"))
+    # URL pública (sin /v1) para la tarjeta de agente; si falta se deduce de la solicitud.
+    public_base_url: str = field(default_factory=lambda: _env("PUBLIC_BASE_URL"))
 
     def __post_init__(self):
         for name in ("rate_limit_per_minute", "max_input_chars", "max_history_turns", "max_history_chars",

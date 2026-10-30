@@ -16,7 +16,9 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 | Modelo | Gemini configurable; predeterminado `gemini-3.5-flash-lite` |
 | Calidad con Gemini real | 34 casos completados; 33 aprobados automáticamente y hallazgos de revisión documentados en [resultados](docs/RESULTADOS_GEMINI.md) |
 | Código público | [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte) |
-| HTTPS y registro en Banorte | Pendientes de despliegue e integración |
+| Despliegue HTTPS | Render (plan gratuito) en `https://carlos-cv-agent.onrender.com`; contenedor listo para Cloud Run con Secret Manager ([guía](docs/CLOUD_RUN.md)) |
+| Registro en la plataforma del reto | URL base `…/v1` + clave Bearer; tarjeta A2A en `/.well-known/agent-card.json` |
+| Observabilidad | Logs JSON por solicitud (Cloud Logging + Cloud Trace), `X-Request-ID`, métricas en `/metrics` |
 
 ## Lectura para el evaluador
 
@@ -96,13 +98,15 @@ uvicorn app.main:app --env-file .env --host 127.0.0.1 --port 8000
 
 El identificador público es el del agente, no el nombre del modelo Gemini. Para un turno posterior, enviar el nuevo `input` y `previous_response_id` de una respuesta almacenada. Con `store=false` no se puede recuperar ni continuar esa respuesta por id; el cliente puede reenviar su historial textual.
 
-**Admitido:** entrada string o mensajes con contenido textual; instrucciones del cliente como preferencias subordinadas; `stream`, `store`, `previous_response_id`, `metadata`, `max_output_tokens`, `temperature` entre 0 y 1. La salida es texto, con `tools=[]`, `truncation=disabled`, `background=false`; no hay compactación automática.
+**Admitido:** entrada string o mensajes con contenido textual (incluida la transcripción completa que reenvían clientes como la plataforma del reto); instrucciones del cliente como preferencias subordinadas; `stream`, `store`, `previous_response_id`, `metadata`, `max_output_tokens`, `temperature` entre 0 y 2 (se aplica como máximo 1 para proteger la fidelidad al CV). La salida es texto, con `tools=[]` y `background=false`. `truncation=disabled` (predeterminado) rechaza historiales demasiado largos; con `truncation=auto` se descartan los turnos más antiguos y se registra `history_truncated`.
+
+**Aceptado e ignorado:** parámetros que los clientes envían por defecto y no cambian lo que el agente puede hacer (`reasoning`, `stream_options`, `include`, `service_tier`, `prompt_cache_key`, `safety_identifier`, `top_logprobs`, penalizaciones, `text.verbosity`). Se registran en logs y en `/metrics` en lugar de devolver 400; la respuesta no los reporta como aplicados.
 
 **Fuera de alcance:** herramientas, imágenes, audio, JSON estructurado, ejecución en segundo plano y WebSockets. Las capacidades no implementadas devuelven 400 en lugar de simularse. La especificación completa evoluciona: esto es una implementación de su superficie textual, no una certificación de conformidad. [Open Responses](https://www.openresponses.org/specification).
 
 Streaming: eventos de creación, mensaje, parte, deltas y cierre, con secuencia creciente. El estado final distingue `response.completed`, `response.incomplete` por límite de salida y `response.failed`. Un fallo transmite un evento `error`; el stream termina con `[DONE]`.
 
-Rutas adicionales: `/` (chat), `/health` (proceso/configuración), `/ready` (200 o 503), `/v1/models`, `/v1/responses/{id}` y `/docs`.
+Rutas adicionales: `/` (chat), `/health` (proceso/configuración), `/ready` (200 o 503), `/v1/models`, `/v1/responses/{id}`, `/metrics` (con clave), `/.well-known/agent-card.json` (tarjeta A2A pública) y `/docs`. Cada respuesta incluye `X-Request-ID`, que también aparece en los logs.
 
 ## Pruebas y evaluaciones
 
@@ -125,7 +129,7 @@ Hay 34 casos: hechos, síntesis, varios turnos, información ausente, privacidad
 ## Límites operativos
 
 - Entrada: 4,000 caracteres por mensaje de usuario; cuerpo HTTP: 64 KiB.
-- Conversación: hasta 12 intercambios previos y 16,000 caracteres totales, sin eliminar silenciosamente contexto.
+- Conversación: hasta 12 intercambios previos y 16,000 caracteres totales por defecto (30 y 40,000 en los despliegues), sin eliminar contexto salvo que el cliente pida `truncation=auto`.
 - Salida: hasta 900 tokens, incluso si el cliente pide más. Tiempo total: hasta 90 segundos.
 - Memoria: hasta 200 respuestas; caducidad de una hora desde su almacenamiento.
 - Solicitudes: 30/minuto por IP observada. Detrás de un proxy se debe configurar su confianza explícitamente; sin ella, varios clientes pueden compartir límite.
@@ -135,4 +139,9 @@ Hay 34 casos: hechos, síntesis, varios turnos, información ausente, privacidad
 
 ## Publicar
 
-[render.yaml](render.yaml) define una instancia de demostración con Gemini explícito y una clave de acceso autogenerada. `constraints.txt` fija las versiones verificadas de dependencias. El repositorio público está creado; el despliegue permanece pendiente de configurar y comprobar el alojamiento. Los pasos y la comprobación de aceptación están en [OPERACION.md](docs/OPERACION.md).
+Dos destinos con el mismo código:
+
+- **Render** — [render.yaml](render.yaml): instancia gratuita con Gemini; la vía más simple. Pasos en [OPERACION.md](docs/OPERACION.md).
+- **Google Cloud Run** — [Dockerfile](Dockerfile) + [deploy/cloudrun.sh](deploy/cloudrun.sh): contenedor sin privilegios, claves en Secret Manager, cuenta de servicio de mínimo privilegio, escala a cero y logs estructurados en Cloud Logging. Pasos en [CLOUD_RUN.md](docs/CLOUD_RUN.md).
+
+`constraints.txt` fija las versiones verificadas de dependencias. El CI ejecuta las pruebas y además construye la imagen y la prueba como contenedor.

@@ -11,3 +11,23 @@ jobs:
       - run: pip install -r requirements-dev.txt -c constraints.txt
       - name: Pruebas de contrato Open Responses + guardrails
         run: LLM_PROVIDER=mock python -m pytest -q
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir la imagen de producción
+        run: docker build -t cv-agent:ci .
+      - name: Prueba de humo del contenedor (proveedor mock, usuario sin privilegios)
+        run: |
+          docker run -d --name cv -p 8080:8080 -e LLM_PROVIDER=mock -e AGENT_API_KEY=ci-key cv-agent:ci
+          for i in $(seq 1 20); do curl -fsS localhost:8080/health && break; sleep 1; done
+          test "$(docker exec cv id -u)" = "10001"
+          curl -fsS localhost:8080/.well-known/agent-card.json | grep -q '"streaming": *true'
+          code=$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/v1/responses -H 'Content-Type: application/json' -d '{"input":"hola"}')
+          test "$code" = "401"
+          curl -fsS localhost:8080/v1/responses -H 'Authorization: Bearer ci-key' -H 'Content-Type: application/json' \
+            -d '{"input":"¿Qué haces actualmente?","reasoning":{"effort":"medium"}}' | grep -q '"status": *"completed"'
+          docker logs cv | grep -q '"severity"'
+      - if: always()
+        run: docker rm -f cv || true

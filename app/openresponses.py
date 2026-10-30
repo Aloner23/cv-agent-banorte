@@ -56,7 +56,7 @@ def validate_body(body: Any) -> dict:
     supported = {"input", "instructions", "model", "previous_response_id", "stream", "store", "metadata", "user",
                  "max_output_tokens", "temperature", "tools", "tool_choice", "parallel_tool_calls", "background",
                  "truncation", "text", "top_p"}
-    for name in body.keys() - supported:
+    for name in body.keys() - supported - IGNORED_PARAMS:
         if body[name] is not None:
             raise InvalidRequest(f"El parámetro '{name}' no está soportado", name, "unsupported_parameter")
     for name in ("model", "previous_response_id", "instructions", "user"):
@@ -74,8 +74,9 @@ def validate_body(body: Any) -> dict:
             raise InvalidRequest("max_output_tokens debe ser un entero positivo", "max_output_tokens")
     if "temperature" in body and body["temperature"] is not None:
         value = body["temperature"]
-        if type(value) not in (int, float) or not 0 <= value <= 1 or not math.isfinite(value):
-            raise InvalidRequest("temperature debe estar entre 0 y 1", "temperature")
+        # El rango del estándar es 0–2; el agente aplica como máximo 1 (ver parse_input).
+        if type(value) not in (int, float) or not 0 <= value <= 2 or not math.isfinite(value):
+            raise InvalidRequest("temperature debe estar entre 0 y 2", "temperature")
     if body.get("top_p") is not None and type(body["top_p"]) not in (int, float):
         raise InvalidRequest("top_p debe ser numérico", "top_p")
     metadata = body.get("metadata")
@@ -84,11 +85,29 @@ def validate_body(body: Any) -> dict:
         raise InvalidRequest("metadata admite hasta 16 pares string (clave 64, valor 512 caracteres)", "metadata")
     for name, allowed in (("tools", ([],)), ("tool_choice", ("auto", "none")),
                           ("background", (False,)), ("parallel_tool_calls", (False,)),
-                          ("truncation", ("disabled",)), ("top_p", (1, 1.0)),
-                          ("text", ({"format": {"type": "text"}},))):
+                          ("truncation", ("disabled", "auto")), ("top_p", (1, 1.0))):
         if name in body and body[name] is not None and body[name] not in allowed:
             raise InvalidRequest(f"Valor de '{name}' no soportado por este agente textual", name, "unsupported_parameter")
+    text_cfg = body.get("text")
+    if text_cfg is not None:
+        fmt = text_cfg.get("format") if isinstance(text_cfg, dict) else None
+        if not isinstance(text_cfg, dict) or (fmt is not None and fmt != {"type": "text"}):
+            raise InvalidRequest("Sólo se admite salida de texto (text.format.type = 'text')", "text", "unsupported_parameter")
     return body
+
+
+# Parámetros que clientes Open Responses suelen enviar por defecto y que no cambian
+# lo que este agente puede hacer. Se aceptan y se ignoran (se registran en logs)
+# en lugar de rechazar la solicitud. Lo que sí cambiaría el comportamiento
+# (tools, salida estructurada, background) se sigue rechazando de forma explícita.
+IGNORED_PARAMS = frozenset({
+    "stream_options", "include", "reasoning", "service_tier", "prompt_cache_key", "prompt_cache_retention",
+    "safety_identifier", "top_logprobs", "max_tool_calls", "presence_penalty", "frequency_penalty",
+})
+
+
+def ignored_params(body: dict) -> list[str]:
+    return sorted(k for k in body.keys() & IGNORED_PARAMS if body[k] is not None)
 
 
 def parse_input(body: dict, history: list[Turn] | None = None) -> AgentRequest:
@@ -130,11 +149,14 @@ def parse_input(body: dict, history: list[Turn] | None = None) -> AgentRequest:
     instr = "\n".join(x for x in [body.get("instructions") or "", *extra_instructions] if x).strip() or None
     max_out = body.get("max_output_tokens")
     temp = body.get("temperature")
+    if temp is not None:
+        temp = min(float(temp), 1.0)  # más creatividad no ayuda a la fidelidad al CV
     return AgentRequest(
         turns=turns,
         client_instructions=instr,
         max_output_tokens=max_out,
         temperature=temp,
+        truncation=body.get("truncation") or "disabled",
     )
 
 
