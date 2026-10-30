@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+.venv/
+.pytest_cache/
+evals/results/
+.DS_Store
+tmp/
+*.log
+evals/* 2.py
