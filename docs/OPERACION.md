@@ -98,10 +98,10 @@ Ante un error de contenido: conservar pregunta, versión y respuesta con datos m
 Antes de declarar entrega completa:
 
 - [ ] CV vigente y contenido autorizado para publicación.
-- [ ] Pruebas técnicas pasan con las dependencias fijadas.
-- [ ] Repositorio público accesible desde fuera de la sesión del titular.
-- [ ] Gemini configurado y probado realmente; modelo/cuota disponibles.
+- [x] Pruebas técnicas pasan con las dependencias fijadas.
+- [x] Repositorio público accesible desde fuera de la sesión del titular.
+- [x] Gemini configurado y probado realmente; consultas de demostración completadas.
 - [ ] Endpoint HTTPS responde con y sin streaming y mantiene varios turnos.
-- [ ] Evaluación de 34 casos revisada, con fallos y límites explícitos.
+- [x] Evaluación de 34 casos revisada, con fallos y límites explícitos.
 - [ ] Agente registrado y funcionando dentro de Banorte.
 - [ ] Demo preparada con resultados actuales, sin secretos en pantalla.

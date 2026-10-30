@@ -63,7 +63,7 @@ El prefijo estable puede beneficiarse de caché del proveedor. Los ahorros depen
 
 **Costo y límite.** Curar es una actividad editorial. Puede introducir omisiones o errores. «Fuente del agente» significa contenido disponible para responder, no una verificación independiente de la experiencia. Las cifras deben conservar los calificadores «reportado», «estimado» o «en desarrollo» que correspondan. La ausencia de un dato no demuestra que el hecho sea falso; sólo impide afirmarlo con estas fuentes.
 
-Las referencias a secciones permiten localizar el respaldo. Una referencia debe llevar a contenido que sustente la afirmación; mencionar un identificador válido no basta. Revisión humana y preguntas adversarias son necesarias para comprobar esa correspondencia.
+El servidor normaliza referencias agrupadas y elimina ids que no están en el contexto, incluso en streaming. Preserva enlaces Markdown. Este control no comprueba que la afirmación esté sustentada. Las referencias a secciones permiten localizar el respaldo. Una referencia debe llevar a contenido que sustente la afirmación; mencionar un identificador válido no basta. Revisión humana y preguntas adversarias son necesarias para comprobar esa correspondencia.
 
 **Evolución.** Registrar dueño, fecha de revisión, estado y evidencia por afirmación. Antes de ampliar el corpus, definir quién puede autorizar su publicación, corregirlo y retirarlo.
 
@@ -92,6 +92,8 @@ Las referencias a secciones permiten localizar el respaldo. Una referencia debe 
 **Decisión.** Combinar reglas del agente, validación, historial acotado, límites de salida, autenticación configurada y controles de exposición de datos.
 
 **Por qué.** El prompt orienta al modelo; el servidor debe imponer lo que puede verificar de forma determinista. Un usuario no puede obtener más presupuesto o autoridad por solicitarlo en el chat. El agente habla de Carlos en tercera persona para identificar claramente que lo representa y no puede asumir compromisos en su nombre.
+
+**Hallazgo real.** El juez aprobó respuestas que imitaban un personaje mientras lo negaban. Un recordatorio adicional tampoco lo resolvió. Por ello, las órdenes directas de cambiar identidad al principio del mensaje reciben una respuesta de alcance sin invocar al modelo; el resto conserva el flujo conversacional. Esta regla puede rechazar una reformulación legítima que comience igual y no cubre variantes no detectadas.
 
 **Límites de la defensa.** Detectar palabras de inyección aporta una señal, no una garantía. Una expresión regular de teléfono no es un sistema general de prevención de fugas. Una API key compartida tampoco ofrece aislamiento por usuario. El historial aportado por el cliente puede contener afirmaciones inventadas: no debe convertirse en fuente de hechos.
 

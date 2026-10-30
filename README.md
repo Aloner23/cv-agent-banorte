@@ -14,7 +14,7 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 | Base de conocimiento | Seis documentos cotejados con el CV aportado; no verificación externa de logros |
 | Pruebas de servidor y proveedor | Sin red, con respuestas controladas; ver [VALIDACION.md](docs/VALIDACION.md) |
 | Modelo | Gemini configurable; predeterminado `gemini-3.5-flash-lite` |
-| Calidad con Gemini real | Conexión comprobada; evaluación y revisión en curso |
+| Calidad con Gemini real | 34 casos completados; 33 aprobados automáticamente y hallazgos de revisión documentados en [resultados](docs/RESULTADOS_GEMINI.md) |
 | Código público | [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte) |
 | HTTPS y registro en Banorte | Pendientes de despliegue e integración |
 

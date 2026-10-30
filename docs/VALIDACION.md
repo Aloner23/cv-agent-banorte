@@ -6,7 +6,7 @@ Revisión: **30 de octubre de 2026**, entorno local de Carlos. Python 3.12.14. D
 
 | Verificación | Resultado | Alcance |
 |---|---|---|
-| Suite `pytest` | **98 pruebas aprobadas** | Servidor, contrato textual, memoria, privacidad numérica, errores y adaptador Gemini con HTTP simulado |
+| Suite `pytest` | **102 pruebas aprobadas** | Servidor, contrato textual, memoria, privacidad numérica, errores y adaptador Gemini con HTTP simulado |
 | Prueba HTTP del servicio en marcha | **3/3 casos técnicos aprobados** | Rol, formación y dos turnos; proveedor `mock` |
 | Navegador de escritorio | Verificado | Envío, recepción SSE, referencia visual a una sección y nueva conversación |
 | Vista móvil 390 px | Verificada | Sin desbordamiento horizontal; composición y lectura del chat |
@@ -34,6 +34,16 @@ Se comprobó una respuesta autenticada de `gemini-3.5-flash-lite`, en modo `full
 
 La revisión encontró además referencias mal formadas y negaciones demasiado absolutas ante datos ausentes. Se reforzó el prompt. El evaluador conserva ahora todas las respuestas de conversaciones, distingue errores de servicio y deja pendientes las rúbricas sin juez. Estos cambios requieren una nueva ejecución; el resultado anterior no se traslada a la versión corregida.
 
+## Evaluación completa con cuota controlada
+
+El [reporte y su revisión](RESULTADOS_GEMINI.md) documentan 34 casos completados, 33 aprobados automáticamente, cero errores de servicio, p50 1.15 s y p95 6.27 s. La revisión posterior encontró defectos no señalados por el juez y se conservan explícitamente en el reporte.
+
+Se comprobó además streaming con Gemini y una continuación sobre PGMM: primer texto en 0.93 s y respuesta completa en 1.39 s en una consulta local. Son observaciones individuales, no objetivos de servicio. El navegador también recibió respuesta real y representó referencias del CV.
+
+La integración continua de GitHub aprobó las 98 pruebas de la primera publicación. La revisión posterior añade pruebas de citas fragmentadas, recordatorio de tono y rechazo de cambios directos de identidad sin invocar al proveedor: **102 pasan localmente**.
+
+Después de los cambios, se repitieron los tres casos de inyección y se inspeccionaron las cuatro respuestas: **3/3 aprobados**, con el caso de cambio directo de rol atendido por una regla sin LLM. [Verificación posterior](RESULTADOS_INYECCION.md). No se suman estos casos al lote anterior para crear un porcentaje nuevo.
+
 ## Qué cubren las pruebas añadidas
 
 - Rechazo de tipos inválidos, mensajes no textuales, herramientas no soportadas, cuerpos demasiado grandes y modelos públicos desconocidos.
@@ -48,8 +58,8 @@ La revisión encontró además referencias mal formadas y negaciones demasiado a
 
 ## Lo que todavía NO se ha demostrado
 
-1. Aprobación completa de calidad: Gemini real ya respondió, pero la primera ejecución dejó 11 de 34 evaluaciones incompletas por errores de servicio.
-2. Evaluación repetida con pausa compartida, transcripción completa y revisión de todos los casos: en curso.
+1. Aprobación integral de calidad: se completaron 34 casos con Gemini; el resultado automático fue 33/34 y la revisión identificó defectos adicionales. No se afirma ausencia de alucinaciones.
+2. Una evaluación independiente: el juez usa el mismo modelo y omitió problemas de tono, referencias y precisión.
 3. Disponibilidad HTTPS, credencial y cuota en una cuenta de alojamiento.
 4. Compatibilidad con el cliente exacto de Banorte: requiere registro y conversación dentro de su plataforma.
 5. Conformidad completa con toda la especificación Open Responses o con todos los SDKs.
