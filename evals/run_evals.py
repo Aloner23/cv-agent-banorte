@@ -78,15 +78,74 @@ def norm(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", s.lower()) if unicodedata.category(c) != "Mn")
 
 
+def has_signal(text: str, signal: str) -> bool:
+    """Coincidencia léxica con límites numéricos, no interpretación de una cifra.
+
+    No acepta 500 dentro de 5000, 5,500, 500.5 o 500 000. Los formatos
+    alternativos y cifras escritas con palabras deben declararse en el caso.
+    Conserva las coincidencias parciales de palabras usadas por la suite.
+    """
+    signal = norm(signal)
+    parts, pos = [], 0
+    for match in re.finditer(r"\d+(?:[.,]\d+)*", signal):
+        parts.append(re.escape(signal[pos:match.start()]))
+        # No alterar identificadores como C1 o la dirección pública de correo.
+        if match.start() == 0 or not signal[match.start() - 1].isalnum():
+            parts.append(r"(?<![\w.,])(?<!\d[ \u00a0\u202f])")
+        parts.append(re.escape(match.group()))
+        if match.end() == len(signal) or not signal[match.end()].isalnum():
+            parts.append(r"(?!\w|[.,]\d|[ \u00a0\u202f]\d{3}(?!\d))")
+        pos = match.end()
+    parts.append(re.escape(signal[pos:]))
+    return re.search("".join(parts), norm(text)) is not None
+
+
+def check_year_associations(case: dict, answer: str) -> list[str]:
+    """Comprueba años junto a entidades en frases, listas o filas de tabla.
+
+    Es una señal conservadora: no resuelve referencias como «ambas comenzaron
+    ese año». Una asociación ambigua exige revisión; no prueba un hecho falso.
+    Si years_required=false, no exige fechas a una pregunta que no las pidió,
+    pero sí revisa las que el modelo decidió añadir.
+    """
+    associations = case.get("year_associations", {})
+    if not associations:
+        return []
+    text = norm(re.sub(r"\*|`", "", answer))
+    year_pattern = r"(?<!\d)(?:19|20)\d{2}(?!\d)"
+    if not case.get("years_required") and not re.search(year_pattern, text):
+        return []
+    entities = {norm(name): {str(year) for year in years} for name, years in associations.items()}
+    entity_pattern = re.compile(r"\b(?:" + "|".join(re.escape(name) for name in entities) + r")\b")
+    seen, invalid = set(), set()
+    for clause in re.split(r"[\n;.!?]", text):
+        matches = list(entity_pattern.finditer(clause))
+        for index, match in enumerate(matches):
+            name = match.group()
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(clause)
+            # Con una sola entidad también admite «2018–2023: Industrial».
+            segment = clause if len(matches) == 1 else clause[match.end():end]
+            years = set(re.findall(year_pattern, segment))
+            if years:
+                seen.add(name)
+                if years != entities[name]:
+                    invalid.add(name)
+    return [f"fechas sin correspondencia inequívoca: {name} ({', '.join(sorted(years))}); revisar"
+            for name, years in entities.items() if name not in seen or name in invalid]
+
+
 def check(case: dict, answer: str, known_refs: set[str] | None = None) -> list[str]:
     """Indicadores deterministas, no una prueba exhaustiva de significado o veracidad."""
     a, fails = norm(answer), []
     if not answer.strip():
         fails.append("respuesta vacía")
-    fails += [f"falta '{x}'" for x in case.get("all", []) if norm(x) not in a]
-    if case.get("any") and not any(norm(x) in a for x in case["any"]):
+    fails += [f"falta '{x}'" for x in case.get("all", []) if not has_signal(a, x)]
+    if case.get("any") and not any(has_signal(a, x) for x in case["any"]):
         fails.append(f"ninguno de {case['any']}")
-    fails += [f"aparece prohibido '{x}'" for x in case.get("none", []) if norm(x) in a]
+    fails += [f"falta señal del grupo {group}" for group in case.get("all_any", [])
+              if not any(has_signal(a, signal) for signal in group)]
+    fails += [f"aparece prohibido '{x}'" for x in case.get("none", []) if has_signal(a, x)]
+    fails += check_year_associations(case, answer)
     if case.get("no_phone") and re.search(r"\+?\d(?:[\s().\-\u200b]*\d){9,}", answer):
         fails.append("posible teléfono numérico en la respuesta")
     if case.get("expect_decline") and not any(norm(x) in a for x in DECLINE):

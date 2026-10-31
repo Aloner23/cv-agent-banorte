@@ -63,7 +63,7 @@ python -m dotenv -f .env run -- python -m evals.run_evals --url https://TU-SERVI
 
 `--judge` además requiere una clave local de proveedor y el mismo corpus que el endpoint. Ejecutarlo implica llamadas adicionales facturables. Los reportes se guardan en `evals/results/`, fuera de Git por defecto. Revisar contenido antes de compartir un reporte.
 
-Los 34 casos más varios turnos pueden superar 30 solicitudes en un minuto. El evaluador deja por defecto 6.1 segundos entre inicios de llamadas al agente y al juez, compartiendo la misma pausa para respetar la cuota del proveedor; si se ajusta el límite, debe documentarse en el reporte. Las latencias miden solicitudes, no incluyen la pausa deliberada. No inflar el límite público para ocultar una prueba fallida.
+La suite actual tiene 38 casos y realiza 40 llamadas al agente; `--judge` añade 38 llamadas al juez. El evaluador deja por defecto 6.1 segundos entre inicios de llamadas al agente y al juez, compartiendo la misma pausa para respetar la cuota del proveedor; si se ajusta el límite, debe documentarse en el reporte. Las latencias miden solicitudes, no incluyen la pausa deliberada. No inflar el límite público para ocultar una prueba fallida. El reporte publicado de 34 casos corresponde a la suite anterior.
 
 Revisar manualmente los casos de títulos no documentados, NPS, costo histórico y ahorro neto, y los de inyección. No aceptar sólo un porcentaje agregado. Comparar con `retrieval` únicamente como experimento explícito, registrando ambos modos.
 
@@ -76,7 +76,7 @@ Revisar manualmente los casos de títulos no documentados, NPS, costo histórico
 5. Seleccionar el agente en el chat y probar una pregunta directa, una continuación, un dato ausente y una pregunta de impacto económico.
 6. Guardar evidencia de la integración y anexar el repositorio público y la demostración.
 
-La revisión inicial sólo alcanzó la pantalla de inicio de sesión; no se conoce aún el payload exacto del cliente Banorte. Si envía un campo no soportado, usar su request real para ajustar el adaptador y añadir una prueba de regresión; no relajar validación indiscriminadamente.
+La integración fue registrada y probada en conversaciones de la plataforma el 30 de octubre de 2026. La URL base utilizada es `https://carlos-cv-agent-980817940108.us-central1.run.app/v1`, con la clave Bearer del agente. Se adaptó el contrato a los mensajes y parámetros observados del cliente. Esto acredita esa integración, no conformidad universal ni la finalización de todos los trámites de la cuenta o la selección actual de posición Senior. Ante un campo nuevo no soportado, revisar la solicitud real y añadir una prueba de regresión; no relajar validación indiscriminadamente.
 
 ## 6. Operación mínima
 
@@ -105,7 +105,8 @@ Antes de declarar entrega completa:
 - [x] Pruebas técnicas pasan con las dependencias fijadas.
 - [x] Repositorio público accesible desde fuera de la sesión del titular.
 - [x] Gemini configurado y probado realmente; consultas de demostración completadas.
-- [x] Endpoint HTTPS responde con y sin streaming y mantiene varios turnos (versión 1.1.1 verificada).
-- [x] Evaluación de 34 casos revisada, con fallos y límites explícitos.
+- [x] Endpoint HTTPS con JSON, SSE y continuidad entre revisiones verificado en Cloud Run 1.2.0; repetir las comprobaciones al desplegar cambios.
+- [x] Evaluación histórica de 34 casos revisada, con fallos y límites explícitos.
+- [ ] Nueva evaluación completa atribuible a la revisión actual de código, prompt y corpus.
 - [x] Agente registrado y funcionando dentro de la plataforma del reto Banorte.
 - [x] Guion de demo preparado con resultados actuales; falta realizar la presentación.

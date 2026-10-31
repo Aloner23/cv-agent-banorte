@@ -92,6 +92,25 @@ def test_request_size_and_json_encoding(api):
     assert client.post("/v1/responses", content='{}', headers=H).status_code == 415
 
 
+def test_oversized_json_integer_returns_sanitized_400_without_provider(api, monkeypatch):
+    client, main = api
+
+    async def unexpected_provider_call(*args, **kwargs):
+        raise AssertionError("El JSON inválido no debe llegar al proveedor")
+        yield ""
+
+    monkeypatch.setattr(main.agent, "stream", unexpected_provider_call)
+    body = '{"input":"synthetic-private-input","max_output_tokens":' + "9" * 5000 + "}"
+    assert len(body.encode()) < main.settings.max_request_bytes
+
+    response = client.post("/v1/responses", content=body,
+                           headers={**H, "Content-Type": "application/json"})
+
+    assert response.status_code == 400
+    assert response.json() == {"error": {"message": "JSON inválido", "type": "invalid_request",
+                                         "code": "invalid_request", "param": None}}
+
+
 def test_effective_model_and_generation_limits(api):
     client, main = api
     unknown = client.post("/v1/responses", json={"input": "hola", "model": "nonexistent"}, headers=H)

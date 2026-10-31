@@ -1,6 +1,18 @@
 # Evidencia de validación
 
-Revisión: **30 de octubre de 2026**, entorno local de Carlos. Python 3.12.14. Dependencias fijadas en `constraints.txt`.
+Dependencias fijadas en `constraints.txt`. Las comprobaciones siguientes identifican su revisión: una prueba técnica simulada no acredita calidad del modelo, y una evaluación histórica no se traslada a un nuevo prompt o corpus.
+
+## Auditoría y correcciones · 31 de octubre de 2026
+
+Antes de las correcciones se reprodujeron **140 pruebas técnicas aprobadas** sobre el contenido de `4fcd41aeb2a1566ae62d8b61c4fd566ee7948869`. El servicio público informó versión 1.2.0, código `e140ce3021def011b8ffe12421c38608cec222d2`, prompt `d3ff749428a6` y corpus `5e8bacea90d0`; `/v1/models` sin clave devolvió 401. `/health` y `/ready` sólo comprobaron configuración, sin generar una respuesta nueva.
+
+La revisión 1.2.1 corrige el error 500 ante un entero JSON excesivo, endurece los criterios de evaluación de cantidades, fechas y matices económicos, y reconcilia la documentación y la fuente del agente con Cloud Run. El lote histórico de 33/34 utilizó el corpus `00f9aee5320c`, distinto de las revisiones posteriores; no se presenta como exactitud de la versión actual. Las regresiones del evaluador usan respuestas sintéticas para probar sus criterios, no para medir Gemini. Una evaluación completa con el corpus actualizado sigue pendiente.
+
+**185 pruebas técnicas aprobadas** en Python 3.12, sin red ni credenciales reales. La suite dorada tiene ahora **38 casos y 21 rúbricas**, con 40 llamadas al agente y 38 adicionales si se activa el juez. Los casos de rúbrica sin juez permanecen pendientes. El corpus actualizado es `5f2d27259454`; el prompt no cambió. Se conservó la advertencia previa de deprecación de TestClient/httpx. La aceptación del despliegue requiere comprobar el SHA publicado en CI y en `/health`, además de JSON/SSE; estas pruebas locales no acreditan por sí solas esa aceptación.
+
+## Evidencia histórica · 30 de octubre de 2026
+
+Entorno local de Carlos. Python 3.12.14.
 
 ## Resultado comprobado
 

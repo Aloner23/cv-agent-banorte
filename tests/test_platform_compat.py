@@ -130,7 +130,7 @@ def test_health_exposes_only_valid_build_revision(client, monkeypatch, value, ex
     monkeypatch.setenv('RENDER_GIT_COMMIT', value)
     state = client.get('/health').json()
     assert state['code_revision'] == expected
-    assert state['version'] == '1.2.0'
+    assert state['version'] == '1.2.1'
     assert len(state['prompt_revision']) == 12
     assert 'accidental-secret' not in json.dumps(state)
 

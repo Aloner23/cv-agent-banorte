@@ -14,7 +14,7 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 | Base de conocimiento | Seis documentos cotejados con el CV aportado; no verificación externa de logros |
 | Pruebas de servidor y proveedor | Sin red, con respuestas controladas; ver [VALIDACION.md](docs/VALIDACION.md) |
 | Modelo | Gemini configurable; predeterminado `gemini-3.5-flash-lite` |
-| Calidad con Gemini real | 34 casos completados; 33 aprobados automáticamente y hallazgos de revisión documentados en [resultados](docs/RESULTADOS_GEMINI.md) |
+| Calidad con Gemini real | Lote histórico: 34 casos completados, 33 aprobados automáticamente y hallazgos humanos adicionales; no es la puntuación del prompt/corpus actual. Ver [resultados](docs/RESULTADOS_GEMINI.md) |
 | Código público | [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte) |
 | Despliegue HTTPS | Cloud Run en `https://carlos-cv-agent-980817940108.us-central1.run.app`; Render conservado como respaldo ([guía](docs/CLOUD_RUN.md)) |
 | Registro en la plataforma del reto | Registrado y probado en conversaciones del reto; URL base `…/v1` + clave Bearer |
@@ -22,7 +22,7 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 
 ## Lectura para el evaluador
 
-- [Propuesta de negocio](docs/PROPUESTA_DE_VALOR.md): problema, usuarios, piloto de cuatro semanas, indicadores y caso económico ilustrativo.
+- [Propuesta de negocio](docs/PROPUESTA_DE_VALOR.md): problema, usuarios, piloto de cuatro semanas, indicadores y límites de la valoración económica.
 - [Decisiones técnicas](docs/DECISIONES_TECNICAS.md): alternativas, razones, costos y límites del diseño.
 - [Fuentes y límites](docs/FUENTES_Y_LIMITES.md): cotejo documental, trazabilidad y significado de las cifras.
 - [Validación](docs/VALIDACION.md): evidencia de lo probado y límites de esa evidencia.
@@ -125,14 +125,14 @@ python -m dotenv -f .env run -- python -m evals.run_evals --url https://TU-SERVI
 python -m dotenv -f .env run -- python -m evals.run_evals --url https://TU-SERVICIO.onrender.com --judge
 ```
 
-Hay 34 casos: hechos, síntesis, varios turnos, información ausente, privacidad, inyección, idioma, alcance y matices de impacto. El modo de calidad rechaza endpoints `mock`. Los reportes registran proveedor, modelo, huella del corpus, fecha, respuestas, fallos y latencias. El juez es una señal auxiliar con umbrales; puede compartir errores con el modelo y no reemplaza la revisión humana.
+Hay 38 casos: hechos, síntesis, varios turnos, información ausente, privacidad, inyección, idioma, alcance y matices de impacto. La revisión del 31 de octubre añade límites numéricos, asociaciones de años por carrera y rúbricas de negocio; los criterios son señales heurísticas, no una prueba semántica de veracidad. Los 21 casos con rúbrica quedan pendientes de revisión si se ejecutan sin juez. El modo de calidad rechaza endpoints `mock`. Los reportes registran proveedor, modelo, huella del corpus, fecha, respuestas, fallos y latencias. El juez es una señal auxiliar con umbrales; puede compartir errores con el modelo y no reemplaza la revisión humana. El lote publicado de 34 casos es histórico y no se modifica.
 
 ## Límites operativos
 
 - Entrada: 4,000 caracteres por mensaje de usuario; cuerpo HTTP: 64 KiB.
 - Conversación: hasta 12 intercambios previos y 16,000 caracteres totales por defecto (30 y 40,000 en los despliegues), sin eliminar contexto salvo que el cliente pida `truncation=auto`.
 - Salida: hasta 900 tokens, incluso si el cliente pide más. Tiempo total: hasta 90 segundos.
-- Memoria: hasta 200 respuestas; caducidad de una hora desde su almacenamiento.
+- Historial: hasta 200 respuestas en el backend local en memoria; este tope no aplica a Firestore. Cada respuesta caduca lógicamente una hora después de almacenarse. Una continuación guarda otra copia de sus turnos con una nueva caducidad; no es una retención máxima de una hora desde la primera captura de cada dato. El borrado físico en Firestore es asíncrono.
 - Solicitudes: 30/minuto por IP observada. Detrás de un proxy se debe configurar su confianza explícitamente; sin ella, varios clientes pueden compartir límite.
 - CORS cerrado por defecto; el chat utiliza el mismo origen. Autorizar sólo orígenes necesarios mediante `CORS_ORIGINS`.
 - La clave de acceso y el historial del chat no se guardan en almacenamiento persistente del navegador. El servidor conserva temporalmente las conversaciones si `store=true`.

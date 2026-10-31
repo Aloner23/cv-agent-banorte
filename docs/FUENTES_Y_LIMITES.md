@@ -28,7 +28,7 @@ La sección «Este agente de CV» y las aclaraciones de interpretación son docu
 ## Correcciones realizadas respecto al avance
 
 - Eliminada la instrucción que presentaba PMP y Scrum como certificaciones planeadas: no aparecen en la fuente. La respuesta correcta es que no están documentadas, sin inventar siquiera una intención de obtenerlas.
-- Corregida la afirmación de que este agente ya tiene código público. No se encontró un repositorio del agente entre los accesibles al iniciar la revisión.
+- Al iniciar la revisión no se encontró un repositorio del agente. Posteriormente se publicó [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte); la ausencia inicial es un hallazgo histórico, no el estado actual.
 - Precisado el significado de los indicadores: costo histórico, estimación, tiempo de generación y caso de negocio son conceptos distintos.
 - Las referencias `[id]` se solicitan al modelo y ayudan a revisar una afirmación. No existe un verificador semántico que pruebe automáticamente que cada cita respalda cada frase. Las reglas, los tests y las evaluaciones reducen fallos, no garantizan ausencia de alucinaciones.
 
@@ -56,4 +56,6 @@ Salario, disponibilidad contractual, doctorado, certificaciones no documentadas,
 4. Ejecutar pruebas locales y la evaluación con Gemini; registrar la revisión del corpus, modelo, fecha y resultados.
 5. Desplegar la revisión, verificar la configuración y hacer una conversación real de extremo a extremo.
 
-El almacenamiento temporal de conversaciones es en memoria del proceso, con TTL y capacidad limitados. El navegador no persiste la clave de acceso ni el historial. Esto no equivale a borrado inmediato del servidor ni a una garantía sobre la retención del proveedor: antes de un piloto empresarial se debe acordar la configuración y el tratamiento de los datos con el proveedor aprobado.
+Cloud Run conserva temporalmente las conversaciones en Firestore; el backend en memoria del proceso se utiliza en local y en Render. El límite de 200 respuestas sólo aplica a memoria. Cada respuesta vence lógicamente una hora después de guardarse; el borrado físico de Firestore es asíncrono. Al continuar una conversación se guarda una nueva copia de sus turnos con otra caducidad, por lo que no es un plazo máximo desde la primera captura de cada dato.
+
+El navegador no persiste la clave de acceso ni el historial. Iniciar una conversación nueva no borra registros del servidor, y `store=false` evita nuevas escrituras sin eliminar las anteriores ni impedir el envío de contexto al modelo. Antes de un piloto empresarial se deben acordar la retención, la eliminación y el tratamiento de datos con el proveedor aprobado. Ver [operación de Cloud Run](CLOUD_RUN.md).

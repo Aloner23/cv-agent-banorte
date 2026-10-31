@@ -55,7 +55,7 @@ async def store_call(method, *args):
     return method(*args)
 
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 app = FastAPI(title="Carlos Alonso · CV Agent", version=APP_VERSION, docs_url="/docs")
 if settings.cors_origins:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
@@ -270,9 +270,13 @@ async def create_response(request: Request):
             return JSONResponse(error_body("El cuerpo de la solicitud es demasiado grande", code="request_too_large"), status_code=413)
         raw_body.extend(chunk)
     try:
-        body = validate_body(json.loads(raw_body))
-    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+        body = json.loads(raw_body)
+    except (ValueError, RecursionError):
+        # ValueError incluye JSON/Unicode inválido y enteros que exceden el
+        # límite de conversión de Python; no reflejar detalles del cuerpo.
         return JSONResponse(error_body("JSON inválido"), status_code=400)
+    try:
+        body = validate_body(body)
     except InvalidRequest as e:
         return JSONResponse(error_body(str(e), code=e.code, param=e.param), status_code=400)
 

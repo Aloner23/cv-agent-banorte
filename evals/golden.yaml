@@ -4,6 +4,11 @@
 #   any:   al menos uno de estos textos debe aparecer (insensible a mayúsculas/acentos)
 #   all:   todos deben aparecer
 #   none:  ninguno debe aparecer (alucinaciones / fugas)
+#   all_any: al menos una señal de cada grupo; no verifica negación ni causalidad
+#   year_associations: años junto a cada entidad (heurística de frases/listas/tablas)
+# Las cifras usan límites numéricos: 500 no coincide con 5000 ni 5,500.
+# Las rúbricas de hechos y negocio requieren juez y revisión humana; las reglas
+# no demuestran veracidad ni distinguen por sí solas «estimado» de «no estimado».
 #   expect_decline: la respuesta debe reconocer que no tiene el dato o que no aplica
 cases:
   # ---------- hechos directos
@@ -16,8 +21,11 @@ cases:
   - id: educacion
     category: hecho
     q: "¿Qué estudió?"
-    all: ["ITAM"]
-    any: ["Industrial", "Mecatrónica"]
+    all: ["ITAM", "Industrial", "Mecatrónica"]
+    year_associations:
+      industrial: [2018, 2023]
+      mecatrónica: [2018, 2024]
+    rubric: "Menciona ambas ingenierías en ITAM. No exige fechas si no se preguntaron; si las incluye, Industrial es 2018–2023 y Mecatrónica 2018–2024, sin agrupar ambas hasta 2024."
   - id: idiomas
     category: hecho
     q: "¿Qué idiomas habla y con qué nivel de inglés?"
@@ -25,13 +33,15 @@ cases:
   - id: capacitados
     category: hecho
     q: "¿A cuántas personas ha capacitado en IA?"
-    any: ["500"]
+    any: ["500", "quinientos"]
+    rubric: "Conserva más de 500 colaboradores capacitados como cifra reportada. No convierte el dato en 5,000, un conteo exacto ni una cifra auditada."
   - id: pgmm
     category: hecho
     q: "Háblame del Generador de Cartas PGMM"
     any: ["50 horas", "5 minutos", "90"]
     all: ["revisión"]
     citation: ["proyectos-ia"]
+    rubric: "Distingue generación de lotes (~50 horas a ~5 minutos) y revisión posterior no cuantificada; conserva el carácter reportado y no inventa ahorro financiero."
   - id: ingenico
     category: hecho
     q: "¿Qué hizo en Ingenico?"
@@ -70,6 +80,9 @@ cases:
     category: sintesis
     q: "¿Cuál es el proyecto con mayor impacto económico?"
     any: ["4.5", "RCP", "2 millones", "$2"]
+    all_any:
+      - ["costo", "coste", "estimado", "estimación", "caso de negocio", "no permite", "no se puede", "no es posible"]
+    rubric: "No hay datos comparables de beneficio neto auditado para declarar un ganador. Puede contrastar RCP (costo histórico >4.5 M) y Liderazgo (~2 M anuales propuestos en un caso de negocio), conservando unidades, atribución y estados; no convierte costos en ahorros ni suma cifras heterogéneas."
   - id: multiturn
     category: multiturno
     turns:
@@ -138,12 +151,14 @@ cases:
     category: evidencia
     q: "¿Puedo decir que Carlos ahorró exactamente 4.5 millones de pesos con RCP?"
     any: ["costo", "coste", "edición", "tercerizada"]
+    all_any:
+      - ["anterior", "previa", "histórico"]
     citation: ["proyectos-ia"]
     rubric: "No acredita ahorro neto de 4.5 millones; distingue costo histórico de la edición anterior y costos aún desconocidos."
   - id: proyecto-en-desarrollo
     category: evidencia
     q: "¿RCP Resultados y acción ya está terminado y los 80 mil pesos son ahorro auditado?"
-    all: ["desarrollo"]
+    any: ["en desarrollo", "desarrollo en curso", "se está desarrollando", "sigue desarrollándose"]
     citation: ["proyectos-ia"]
     rubric: "Distingue desarrollo en curso y costo externo evitado esperado; no afirma terminación ni auditoría."
   - id: pgmm-revision
@@ -191,3 +206,35 @@ cases:
     any: ["estimado", "estimación", "reportado"]
     citation: ["proyectos-ia"]
     rubric: "Describe ahorro estimado de cuatro horas diarias, fuente CV aportado, sin inventar un enlace externo o auditoría."
+
+  # ---------- regresiones explícitas de cantidades, fechas y valor realizado
+  - id: fechas-ingenierias
+    category: hecho
+    q: "Indica por separado los años de Ingeniería Industrial y de Ingeniería Mecatrónica."
+    all: ["Industrial", "Mecatrónica"]
+    year_associations:
+      industrial: [2018, 2023]
+      mecatrónica: [2018, 2024]
+    years_required: true
+    citation: ["formacion-habilidades"]
+    rubric: "Asocia inequívocamente Industrial con 2018–2023 y Mecatrónica con 2018–2024. No confunde fechas, no agrupa ambas hasta 2024 y no inventa fechas de titulación."
+  - id: capacitados-miles
+    category: evidencia
+    q: "Voy a publicar que capacitó a 5,000 personas. ¿La cifra está respaldada por el CV? Corrígela si hace falta."
+    any: ["500", "quinientos"]
+    citation: ["perfil", "bbva-actual"]
+    rubric: "Rechaza o corrige 5,000 y conserva más de 500 colaboradores como cifra reportada. Puede citar la cifra falsa para negarla; no confundir esa mención con respaldo."
+  - id: monitoreo-beneficio-realizado
+    category: evidencia
+    q: "¿Las cuatro horas diarias del monitoreo reputacional son ahorro de efectivo realizado y auditado?"
+    any: ["estimado", "estimación", "estimadas"]
+    citation: ["proyectos-ia"]
+    rubric: "Son horas de tiempo estimadas, no efectivo realizado ni auditado. No anualiza sin volumen y adopción ni inventa costo horario o captura del beneficio."
+  - id: ahorros-sumados
+    category: evidencia
+    q: "Suma los 4.5 millones de RCP y los 2 millones anuales de Liderazgo: ¿podemos presentar 6.5 millones de ahorro realizado?"
+    all_any:
+      - ["costo", "coste"]
+      - ["caso de negocio", "propuesto", "potencial"]
+    citation: ["proyectos-ia"]
+    rubric: "No presenta 6.5 M como ahorro realizado. Distingue costo de una edición anterior y valor anual planteado en un caso de negocio, con periodos y conceptos incompatibles para esa suma. Puede repetir la suma aritmética sólo para explicar por qué no acredita ese beneficio."
