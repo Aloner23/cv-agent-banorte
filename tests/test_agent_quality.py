@@ -1,6 +1,7 @@
 """Invariantes de privacidad, contexto y evaluación; no prueban calidad del LLM."""
 import asyncio
 import json
+import re
 import sys
 
 import httpx
@@ -63,6 +64,24 @@ def test_phone_never_leaks_at_any_stream_boundary(phone):
 def test_numbers_for_cv_metrics_are_preserved():
     text = "2018 - 2023. Más de 500 colaboradores, 180 iniciativas y ahorro estimado de 4 horas."
     assert CVAgent.redact(text) == text
+
+
+def test_public_urls_in_knowledge_survive_output_guardrails():
+    subject = agent()
+    urls = {url.rstrip(".,;!?)]}") for doc in subject.kb.docs
+            for url in re.findall(r"https?://[^\s<>]+", doc.body)}
+    assert urls, "El corpus debe incluir los enlaces públicos del agente"
+    request = AgentRequest(turns=[Turn("user", "¿Dónde puedo probar el agente?")])
+
+    async def run():
+        for url in urls:
+            text = f"Puedes consultar {url}."
+            assert CVAgent.redact(text) == text
+            subject.provider = Deltas(list(text))
+            output = "".join([delta async for delta in subject.stream(request)])
+            assert output == text
+
+    asyncio.run(run())
 
 
 def test_citations_are_normalized_at_every_stream_boundary_without_breaking_links():
