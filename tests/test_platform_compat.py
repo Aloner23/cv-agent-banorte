@@ -160,3 +160,24 @@ def test_json_logs_are_cloud_logging_compatible_and_carry_no_content(monkeypatch
     assert entry["request_id"] == "rid-1"
     assert entry["logging.googleapis.com/trace"] == "projects/demo-project/traces/0123456789abcdef0123456789abcdef"
     assert entry["input_tokens"] == 10
+
+
+# ---------------------------------------------------------------- citas
+def test_citations_hidden_by_default_and_returned_as_annotations(client):
+    part = post(client, input="¿Qué proyectos de IA has construido?").json()["output"][0]["content"][0]
+    assert "[proyectos-ia]" not in part["text"] and "[perfil]" not in part["text"]
+    assert part["annotations"], "las fuentes deben viajar como annotations"
+    a = part["annotations"][0]
+    assert a["type"] == "file_citation" and a["file_id"] and a["filename"] and 0 <= a["index"] <= len(part["text"])
+
+
+def test_client_can_ask_for_inline_citations(client):
+    part = post(client, input="¿Qué proyectos de IA has construido?",
+                metadata={"citations": "inline"}).json()["output"][0]["content"][0]
+    first = part["annotations"][0]
+    assert part["text"][first["index"]:].startswith(f"[{first['file_id']}]")
+
+
+def test_invalid_citation_preference_is_rejected(client):
+    r = post(client, metadata={"citations": "footnotes"})
+    assert r.status_code == 400 and r.json()["error"]["param"] == "metadata"

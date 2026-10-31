@@ -51,18 +51,42 @@ def test_numbers_for_cv_metrics_are_preserved():
 
 def test_citations_are_normalized_at_every_stream_boundary_without_breaking_links():
     raw = 'Carlos [perfil, bbva-actual] [límites]. [LinkedIn](https://example.test) [proyectos-ia]'
-    expected = 'Carlos [perfil] [bbva-actual] . [LinkedIn](https://example.test) [proyectos-ia]'
+    expected = {
+        'inline': 'Carlos [perfil] [bbva-actual]. [LinkedIn](https://example.test) [proyectos-ia]',
+        'hidden': 'Carlos. [LinkedIn](https://example.test)',
+    }
     subject = agent()
-    request = AgentRequest(turns=[Turn('user', 'perfil')])
 
     async def run():
-        for split in range(1, len(raw)):
-            subject.provider = Deltas([raw[:split], raw[split:]])
-            assert ''.join([d async for d in subject.stream(request)]) == expected
-        subject.provider = Deltas(list(raw))
-        assert ''.join([d async for d in subject.stream(request)]) == expected
+        for mode, want in expected.items():
+            request = AgentRequest(turns=[Turn('user', 'perfil')], citations=mode)
+            for split in range(1, len(raw)):
+                subject.provider = Deltas([raw[:split], raw[split:]])
+                assert ''.join([d async for d in subject.stream(request)]) == want, (mode, split)
+            subject.provider = Deltas(list(raw))
+            assert ''.join([d async for d in subject.stream(request)]) == want, mode
 
     asyncio.run(run())
+
+
+def test_hidden_citations_become_positioned_sources():
+    raw = 'Trabaja en BBVA [bbva-actual] y lidera IA [perfil] [proyectos-ia].'
+    subject = agent()
+
+    async def run(mode):
+        usage = {}
+        subject.provider = Deltas(list(raw))
+        text = ''.join([d async for d in subject.stream(AgentRequest(turns=[Turn('user', 'x')], citations=mode), usage)])
+        return text, usage['citations']
+
+    text, cited = asyncio.run(run('hidden'))
+    assert text == 'Trabaja en BBVA y lidera IA.'
+    assert cited == [(15, 'bbva-actual'), (27, 'perfil'), (27, 'proyectos-ia')]
+    assert text[:15] == 'Trabaja en BBVA'
+
+    text, cited = asyncio.run(run('inline'))
+    assert text == raw
+    assert [text[i:i + len(ref) + 2] for i, ref in cited] == ['[bbva-actual]', '[perfil]', '[proyectos-ia]']
 
 
 def test_role_override_adds_professional_tone_reminder_without_replacing_cv():
@@ -182,7 +206,8 @@ def test_extractive_demo_preserves_company_in_followup_context():
     subject = agent()
     request = AgentRequest(turns=[Turn("user", "¿Qué hizo Carlos en Ingenico?"),
                                   Turn("assistant", "Fue analista de datos."),
-                                  Turn("user", "¿Qué tecnologías usó ahí?")])
+                                  Turn("user", "¿Qué tecnologías usó ahí?")],
+                           citations="inline")
 
     async def run():
         return "".join([delta async for delta in subject.stream(request)])

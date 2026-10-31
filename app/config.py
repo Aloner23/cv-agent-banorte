@@ -41,6 +41,8 @@ class Settings:
     knowledge_dir: Path = field(default_factory=lambda: Path(_env("KNOWLEDGE_DIR", str(ROOT / "knowledge"))))
 
     public_model_name: str = field(default_factory=lambda: _env("PUBLIC_MODEL_NAME", "carlos-cv-agent"))
+    # Citas: hidden = el texto no muestra [id]; las fuentes viajan como annotations. inline = [id] visibles.
+    citation_display: str = field(default_factory=lambda: _env("CITATION_DISPLAY", "hidden"))
     # URL pública (sin /v1) para la tarjeta de agente; si falta se deduce de la solicitud.
     public_base_url: str = field(default_factory=lambda: _env("PUBLIC_BASE_URL"))
 
@@ -50,6 +52,8 @@ class Settings:
                      "response_store_max_items", "response_store_ttl_seconds", "retrieval_top_k"):
             if getattr(self, name) <= 0 or not math.isfinite(getattr(self, name)):
                 raise ValueError(f"{name} debe ser mayor que cero")
+        if self.citation_display not in ("hidden", "inline"):
+            raise ValueError("CITATION_DISPLAY debe ser hidden o inline")
         if self.knowledge_mode not in ("full", "retrieval"):
             raise ValueError("KNOWLEDGE_MODE debe ser full o retrieval")
 

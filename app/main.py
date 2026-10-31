@@ -20,6 +20,7 @@ from .openresponses import (
     InvalidRequest,
     ResponseStore,
     error_body,
+    citation_annotations,
     ignored_params,
     message_item,
     new_id,
@@ -37,6 +38,7 @@ settings = get_settings()
 agent = CVAgent(settings)
 store = ResponseStore(settings.response_store_max_items, settings.response_store_ttl_seconds)
 metrics = Metrics()
+titles = {d.doc_id: d.title for d in agent.kb.docs}
 _hits: OrderedDict[str, deque] = OrderedDict()
 
 APP_VERSION = "1.1.0"
@@ -305,7 +307,8 @@ async def create_response(request: Request):
         reason = usage.get("finish_reason")
         incomplete = reason in ("max_output_tokens", "content_filter")
         status = "incomplete" if incomplete else "completed"
-        final = response_obj(**common, status=status, output=[message_item(msg_id, text, status)],
+        annotations = citation_annotations(usage.get("citations"), titles)
+        final = response_obj(**common, status=status, output=[message_item(msg_id, text, status, annotations)],
                              usage=usage, completed_at=int(time.time()),
                              incomplete_details={"reason": reason} if incomplete else None)
         if body.get("store", True) is not False:
@@ -317,6 +320,7 @@ async def create_response(request: Request):
             "ttft_ms": None if ttft_ms is None else int(ttft_ms), "stream": bool(body.get("stream")),
             "input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens"),
             "flags": req.flags, "turns": len(req.turns), "finish_reason": usage.get("finish_reason"),
+            "cited_sources": sorted({a["file_id"] for a in annotations}),
             "provider": agent.provider_name, "model": agent.model,
             "knowledge_revision": getattr(agent.kb, "revision", None)}})
         return final
@@ -374,8 +378,12 @@ async def create_response(request: Request):
             yield "data: [DONE]\n\n"
             return
         final = finish(text, usage, ttft)
+        part = final["output"][0]["content"][0]
+        for i, annotation in enumerate(part["annotations"]):
+            yield sse("response.output_text.annotation.added", item_id=msg_id, output_index=0, content_index=0,
+                      annotation_index=i, annotation=annotation)
         yield sse("response.output_text.done", item_id=msg_id, output_index=0, content_index=0, text=text, logprobs=[])
-        yield sse("response.content_part.done", item_id=msg_id, output_index=0, content_index=0, part=output_text_part(text))
+        yield sse("response.content_part.done", item_id=msg_id, output_index=0, content_index=0, part=part)
         yield sse("response.output_item.done", output_index=0, item=final["output"][0])
         yield sse(f"response.{final['status']}", response=final)
         yield "data: [DONE]\n\n"

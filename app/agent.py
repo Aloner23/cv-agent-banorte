@@ -68,11 +68,50 @@ INJECTION_PATTERNS = re.compile(
 # No promete detectar números escritos con palabras u otras codificaciones.
 PHONE_PATTERN = re.compile(r"\+?\d(?:[\s().\-\u200b]*\d){9,}")
 PHONE_TAIL = re.compile(r"[+\d][\d\s().\-\u200b]*$")
-CITATION_PATTERN = re.compile(r"\[([\w-]+(?:\s*,\s*[\w-]+)*)\](?!\()")
+CITATION_PATTERN = re.compile(r"([ \t]*)\[([\w-]+(?:\s*,\s*[\w-]+)*)\](?!\()")
 ROLE_OVERRIDE_PATTERN = re.compile(
     r"^\s*(?:a partir de ahora eres|desde ahora (?:eres|ser[aá]s)|you are now|from now on you are)\b",
     re.I,
 )
+
+
+class CitationDisplay:
+    """Última etapa del stream: registra cada cita [id] válida y, si se pide, la quita del texto visible.
+
+    El modelo siempre cita (es lo que permite evaluar fidelidad); este filtro decide
+    si el lector ve los corchetes o sólo recibe las fuentes como anotaciones.
+    Las posiciones registradas están en coordenadas del texto que se emite.
+    """
+
+    def __init__(self, refs: list[str], hide: bool):
+        self.hide = hide
+        self.pattern = (re.compile(r"[ \t]*\[(" + "|".join(map(re.escape, refs)) + r")\]") if refs else None)
+        self.offset = 0
+        self.pending = ""   # espacios finales retenidos: la cita podría venir en el siguiente fragmento
+        self.cited: list[tuple[int, str]] = []
+
+    def feed(self, chunk: str, final: bool = False) -> str:
+        text, self.pending = self.pending + chunk, ""
+        if self.pattern is None:
+            out = text
+        else:
+            parts, last, emitted = [], 0, 0
+            for m in self.pattern.finditer(text):
+                keep = text[last:m.start()] if self.hide else text[last:m.end()]
+                parts.append(keep)
+                emitted += len(keep)
+                # Oculta: donde estaba la cita. Visible: posición del "[".
+                pos = self.offset + (emitted if self.hide else emitted - len(m.group(1)) - 2)
+                self.cited.append((pos, m.group(1)))
+                last = m.end()
+            parts.append(text[last:])
+            out = "".join(parts)
+        if self.hide and not final:
+            trailing = re.search(r"[ \t]+$", out)
+            if trailing:
+                self.pending, out = out[trailing.start():], out[:trailing.start()]
+        self.offset += len(out)
+        return out
 
 
 def normalize_citations(text: str, refs: list[str]) -> str:
@@ -80,8 +119,9 @@ def normalize_citations(text: str, refs: list[str]) -> str:
     allowed = set(refs)
 
     def replace(match):
-        ids = [item.strip() for item in match[1].split(',')]
-        return ' '.join(f'[{ref}]' for ref in dict.fromkeys(ids) if ref in allowed)
+        ids = [item.strip() for item in match[2].split(',')]
+        kept = ' '.join(f'[{ref}]' for ref in dict.fromkeys(ids) if ref in allowed)
+        return match[1] + kept if kept else ''  # sin ids válidos, desaparece con su espacio previo
 
     return CITATION_PATTERN.sub(replace, text)
 
@@ -99,6 +139,7 @@ class AgentRequest:
     max_output_tokens: int | None = None
     temperature: float | None = None
     truncation: str = "disabled"
+    citations: str | None = None  # "inline" | "hidden"; None = configuración del servidor
     flags: list[str] = field(default_factory=list)
 
 
@@ -195,6 +236,7 @@ class CVAgent:
             )
             return
         buf, citation_buf = "", ""
+        display = CitationDisplay(refs, hide=(req.citations or self.settings.citation_display) == "hidden")
         async for delta in self.provider.stream(
             system=system,
             turns=req.turns,
@@ -213,13 +255,19 @@ class CVAgent:
                 closing = citation_buf.find(']', start)
                 if closing < 0 or closing == len(citation_buf) - 1:
                     cut = start
+            # Los espacios antes del corte pueden preceder a una cita que se descartará.
+            while cut > 0 and citation_buf[cut - 1] in " \t":
+                cut -= 1
             buf += normalize_citations(citation_buf[:cut], refs)
             citation_buf = citation_buf[cut:]
             tail = PHONE_TAIL.search(buf)
             safe_end = tail.start() if tail else len(buf)
             if safe_end:
-                yield self.redact(buf[:safe_end])
+                if (out := display.feed(self.redact(buf[:safe_end]))):
+                    yield out
                 buf = buf[safe_end:]
         buf += normalize_citations(citation_buf, refs)
-        if buf:
-            yield self.redact(buf)
+        if (out := display.feed(self.redact(buf), final=True)):
+            yield out
+        if usage is not None:
+            usage["citations"] = display.cited

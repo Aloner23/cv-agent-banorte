@@ -103,7 +103,8 @@ def check(case: dict, answer: str, known_refs: set[str] | None = None) -> list[s
 
 
 async def ask(client: httpx.AsyncClient, url: str, text: str, prev: str | None, model: str = "carlos-cv-agent") -> tuple[str, str, float, dict]:
-    body = {"model": model, "input": text}
+    # La evaluación verifica las citas en el texto, así que las pide visibles.
+    body = {"model": model, "input": text, "metadata": {"citations": "inline"}}
     if prev:
         body["previous_response_id"] = prev
     t0 = time.perf_counter()

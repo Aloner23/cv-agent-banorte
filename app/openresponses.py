@@ -157,22 +157,39 @@ def parse_input(body: dict, history: list[Turn] | None = None) -> AgentRequest:
         max_output_tokens=max_out,
         temperature=temp,
         truncation=body.get("truncation") or "disabled",
+        citations=_citation_preference(body.get("metadata")),
     )
 
 
+def _citation_preference(metadata: dict | None) -> str | None:
+    """metadata.citations = "inline" | "hidden" permite a un cliente elegir cómo ver las fuentes."""
+    value = (metadata or {}).get("citations")
+    if value is None:
+        return None
+    if value not in ("inline", "hidden"):
+        raise InvalidRequest("metadata.citations debe ser 'inline' o 'hidden'", "metadata")
+    return value
+
+
+def citation_annotations(citations: list[tuple[int, str]] | None, titles: dict[str, str]) -> list[dict]:
+    """Convierte las citas del agente en anotaciones file_citation (una por cita, en orden)."""
+    return [{"type": "file_citation", "file_id": doc_id, "filename": titles.get(doc_id, doc_id), "index": index}
+            for index, doc_id in (citations or [])]
+
+
 # ---------------------------------------------------------------- salida
-def message_item(item_id: str, text: str, status: str) -> dict:
+def message_item(item_id: str, text: str, status: str, annotations: list[dict] | None = None) -> dict:
     return {
         "type": "message",
         "id": item_id,
         "status": status,
         "role": "assistant",
-        "content": [] if status == "in_progress" and not text else [output_text_part(text)],
+        "content": [] if status == "in_progress" and not text else [output_text_part(text, annotations)],
     }
 
 
-def output_text_part(text: str) -> dict:
-    return {"type": "output_text", "text": text, "annotations": [], "logprobs": []}
+def output_text_part(text: str, annotations: list[dict] | None = None) -> dict:
+    return {"type": "output_text", "text": text, "annotations": annotations or [], "logprobs": []}
 
 
 def usage_obj(u: dict | None) -> dict | None:

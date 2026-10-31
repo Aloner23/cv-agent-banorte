@@ -75,7 +75,12 @@ def test_streaming_event_order(client):
     types = [e["type"] for e in evs]
     assert types[:4] == ["response.created", "response.in_progress", "response.output_item.added", "response.content_part.added"]
     assert types[-4:] == ["response.output_text.done", "response.content_part.done", "response.output_item.done", "response.completed"]
-    assert all(t == "response.output_text.delta" for t in types[4:-4]) and len(types) > 8
+    middle = types[4:-4]
+    n_deltas = sum(t == "response.output_text.delta" for t in middle)
+    assert middle[:n_deltas] == ["response.output_text.delta"] * n_deltas and n_deltas > 4
+    assert all(t == "response.output_text.annotation.added" for t in middle[n_deltas:])
+    annotations = [e["annotation"] for e in evs if e["type"] == "response.output_text.annotation.added"]
+    assert annotations == evs[-1]["response"]["output"][0]["content"][0]["annotations"]
     seqs = [e["sequence_number"] for e in evs]
     assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
     deltas = "".join(e["delta"] for e in evs if e["type"] == "response.output_text.delta")
