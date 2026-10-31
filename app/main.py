@@ -32,6 +32,7 @@ from .openresponses import (
     response_obj,
     validate_body,
 )
+from .shared_store import FirestoreResponseStore, StoreUnavailable
 from .providers import DEFAULT_QUOTA_RETRY_SECONDS, ProviderError
 
 configure_logging()
@@ -39,12 +40,22 @@ log = logging.getLogger("cv-agent")
 
 settings = get_settings()
 agent = CVAgent(settings)
-store = ResponseStore(settings.response_store_max_items, settings.response_store_ttl_seconds)
+store = (FirestoreResponseStore(settings.google_cloud_project, settings.firestore_database,
+                                settings.firestore_collection, settings.response_store_ttl_seconds)
+         if settings.response_store_backend == "firestore" else
+         ResponseStore(settings.response_store_max_items, settings.response_store_ttl_seconds))
 metrics = Metrics()
 titles = {d.doc_id: d.title for d in agent.kb.docs}
 _hits: OrderedDict[str, deque] = OrderedDict()
 
-APP_VERSION = "1.1.1"
+async def store_call(method, *args):
+    # Sólo la E/S remota usa un thread: el LRU local sigue en el event loop.
+    if isinstance(store, FirestoreResponseStore):
+        return await asyncio.to_thread(method, *args)
+    return method(*args)
+
+
+APP_VERSION = "1.2.0"
 app = FastAPI(title="Carlos Alonso · CV Agent", version=APP_VERSION, docs_url="/docs")
 if settings.cors_origins:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
@@ -138,6 +149,7 @@ def health():
     return {
         "status": "ok",
         "version": APP_VERSION,
+        "response_store_backend": settings.response_store_backend,
         "code_revision": revision if re.fullmatch(r"[0-9a-f]{40}", revision) else None,
         "prompt_revision": hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest()[:12],
         "ready": not reasons,
@@ -239,7 +251,7 @@ def agent_card(request: Request):
 async def get_response(resp_id: str, request: Request):
     if (err := _check_auth(request)):
         return err
-    found = store.get(resp_id)
+    found = await store_call(store.get, resp_id)
     if not found:
         return JSONResponse(error_body(f"Response '{resp_id}' no encontrada", "not_found"), status_code=404)
     return found[1]
@@ -276,7 +288,7 @@ async def create_response(request: Request):
     history = None
     prev = body.get("previous_response_id")
     if prev:
-        found = store.get(prev)
+        found = await store_call(store.get, prev)
         if not found:
             return JSONResponse(
                 error_body(f"previous_response_id '{prev}' no encontrado", "not_found", "previous_response_not_found", "previous_response_id"),
@@ -310,7 +322,7 @@ async def create_response(request: Request):
         log.warning("response_failed", extra={"fields": {
             "response_id": resp_id, "error_code": code, "ms": int((time.perf_counter() - t0) * 1000)}})
 
-    def finish(text: str, usage: dict, ttft_ms: float | None = None) -> dict:
+    async def finish(text: str, usage: dict, ttft_ms: float | None = None) -> dict:
         reason = usage.get("finish_reason")
         incomplete = reason in ("max_output_tokens", "content_filter")
         status = "incomplete" if incomplete else "completed"
@@ -319,7 +331,7 @@ async def create_response(request: Request):
                              usage=usage, completed_at=int(time.time()),
                              incomplete_details={"reason": reason} if incomplete else None)
         if body.get("store", True) is not False:
-            store.put(resp_id, req.turns + [Turn("assistant", text)], final)
+            await store_call(store.put, resp_id, req.turns + [Turn("assistant", text)], final)
         ms = (time.perf_counter() - t0) * 1000
         metrics.record_response(status, ms, usage, req.flags, ttft_ms)
         log.info("response", extra={"fields": {
@@ -352,7 +364,7 @@ async def create_response(request: Request):
                     "model_error", "provider_rate_limit"), status_code=503,
                     headers={"Retry-After": str(retry_after)})
             return JSONResponse(error_body("El modelo no respondió, intenta de nuevo", "model_error", getattr(e, "code", "model_error")), status_code=502)
-        return finish(text, usage)
+        return await finish(text, usage)
 
     # ---------------- streaming SSE
     async def events():
@@ -370,8 +382,10 @@ async def create_response(request: Request):
                     yield sse("response.output_text.delta", item_id=msg_id, output_index=0, content_index=0, delta=delta, logprobs=[])
             if not text.strip() and usage.get("finish_reason") not in ("max_output_tokens", "content_filter"):
                 raise ProviderError("Empty provider response")
+            final = await finish(text, usage, ttft)
         except Exception as e:  # noqa: BLE001 — cualquier fallo debe cerrar el stream con response.failed
-            code = "gateway_timeout" if isinstance(e, TimeoutError) else getattr(e, "code", "server_error")
+            code = ("store_unavailable" if isinstance(e, StoreUnavailable) else
+                    "gateway_timeout" if isinstance(e, TimeoutError) else getattr(e, "code", "server_error"))
             fail(code)
             log.warning("stream_failure", extra={"fields": {"response_id": resp_id, "exception": type(e).__name__}})
             message = "El modelo tardó demasiado" if isinstance(e, TimeoutError) else "No fue posible completar la respuesta"
@@ -384,7 +398,6 @@ async def create_response(request: Request):
             yield sse("response.failed", response=failed)
             yield "data: [DONE]\n\n"
             return
-        final = finish(text, usage, ttft)
         part = final["output"][0]["content"][0]
         for i, annotation in enumerate(part["annotations"]):
             yield sse("response.output_text.annotation.added", item_id=msg_id, output_index=0, content_index=0,
@@ -404,3 +417,10 @@ async def unhandled(_: Request, exc: Exception):
     # No registrar texto del proveedor ni payloads; podrían contener credenciales o CV.
     log.error("unhandled exception=%s", type(exc).__name__)
     return JSONResponse(error_body("Error interno", "server_error"), status_code=500)
+
+
+@app.exception_handler(StoreUnavailable)
+async def unavailable_store(_: Request, exc: StoreUnavailable):
+    metrics.record_error("store_unavailable")
+    log.error("response_failed", extra={"fields": {"error_code": "store_unavailable"}})
+    return JSONResponse(error_body("El historial no está disponible; intenta de nuevo", "server_error", "store_unavailable"), status_code=503)

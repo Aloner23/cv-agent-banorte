@@ -83,3 +83,9 @@ La versión 1.1.1 mejora cierres conversacionales, enlaces de contacto y fechas 
 ### Comprobación posterior al despliegue
 
 Render desplegó correctamente el commit `a012b857dde0e2a0c661b9b28a49bab4b6d61d6f` (versión 1.1.1). CI de GitHub terminó con éxito. El endpoint público devolvió prompt `d3ff749428a6` y corpus `5e8bacea90d0`. Dos solicitudes autenticadas JSON comprobaron enlaces de contacto y fechas 2018–2023 / 2018–2024; una tercera solicitud SSE con `previous_response_id` identificó ITAM como institución de ambas carreras y terminó en `response.completed`. Reporte local: `evals/results/verificacion-publica-1.1.1.json`. Estas tres respuestas son pruebas dirigidas, no una nueva evaluación completa de 34 casos.
+
+## Preparación de Cloud Run · versión 1.2.0
+
+140 pruebas técnicas locales aprobadas. Nuevos casos: continuidad entre dos clientes del almacén compartido simulado, rechazo inmediato de registros vencidos, IDs inválidos sin acceso a la base, errores sin detalles privados, persistencia fallida en JSON/SSE sin falso `completed` y `store=false` sin dependencia del almacén. La instalación de dependencias no presenta conflictos.
+
+Se generaron configuraciones de panel, métricas por logs y política de incidentes; su aceptación en las APIs de Google y la prueba con Firestore real quedan pendientes hasta ejecutar el despliegue. No se presenta una prueba con dobles de Firestore como evidencia de operación real. Render mantiene la versión pública previamente comprobada.

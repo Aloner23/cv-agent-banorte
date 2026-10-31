@@ -66,7 +66,7 @@ Revisar manualmente los casos de títulos no documentados, NPS, costo histórico
 ## 5. Registrar y probar en Banorte
 
 1. Iniciar sesión o completar la creación de cuenta personalmente y seleccionar la posición Senior.
-2. Conversar con el agente Guía y resolver las preguntas de [DEMO.md](DEMO.md).
+2. Conversar con el agente Guía para confirmar formato del endpoint, criterios y fecha de entrega.
 3. En **Agentes → Añadir un agente**, ingresar la URL HTTPS real en el formato que solicite el formulario. El recurso implementado es `POST /v1/responses`; no adivinar si el formulario agrega esa ruta a una base.
 4. Proporcionar `AGENT_API_KEY`, nunca `GEMINI_API_KEY`.
 5. Seleccionar el agente en el chat y probar una pregunta directa, una continuación, un dato ausente y una pregunta de impacto económico.

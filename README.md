@@ -24,7 +24,6 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 
 - [Propuesta de negocio](docs/PROPUESTA_DE_VALOR.md): problema, usuarios, piloto de cuatro semanas, indicadores y caso económico ilustrativo.
 - [Decisiones técnicas](docs/DECISIONES_TECNICAS.md): alternativas, razones, costos y límites del diseño.
-- [Guion de demostración](docs/DEMO.md): conversación de seis minutos y respuestas a preguntas técnicas.
 - [Fuentes y límites](docs/FUENTES_Y_LIMITES.md): cotejo documental, trazabilidad y significado de las cifras.
 - [Validación](docs/VALIDACION.md): evidencia de lo probado y límites de esa evidencia.
 - [Operación y entrega](docs/OPERACION.md): conexión de Gemini, publicación, registro y recuperación ante fallos.
@@ -51,7 +50,7 @@ flowchart LR
 | Gemini y adaptadores separados | Conserva el avance y desacopla el cliente del proveedor | Cambiar de modelo exige reevaluar; no hay respaldo automático |
 | FastAPI + REST directo | Flujo asíncrono compacto y fácil de inspeccionar | El proyecto mantiene el contrato y el parseo SSE |
 | Evidencia y abstención | Evita presentar una estimación como beneficio comprobado | Las citas son solicitadas al modelo, no verificadas semánticamente por código |
-| Memoria temporal de una instancia | Suficiente para el reto, con capacidad y caducidad explícitas | Se pierde al reiniciar; no hay aislamiento por visitante ni escalado horizontal |
+| Historial configurable | Memoria local en Render; Firestore compartido preparado para Cloud Run | TTL lógico de una hora, borrado físico asíncrono; no hay identidad individual por visitante |
 
 El modelo predeterminado se actualizó porque Google limita el acceso a Gemini 2.5 a usuarios anteriores y recomienda modelos recientes para proyectos nuevos. `gemini-3.5-flash-lite` aparece como estable; la disponibilidad para una cuenta concreta se debe comprobar con una llamada real. No se afirma que sea el mejor modelo sin evaluación. [Catálogo oficial](https://ai.google.dev/gemini-api/docs/models), [ficha del modelo](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
 
@@ -144,10 +143,8 @@ Hay 34 casos: hechos, síntesis, varios turnos, información ausente, privacidad
 Dos destinos con el mismo código:
 
 - **Render** — [render.yaml](render.yaml): instancia gratuita con Gemini; la vía más simple. Pasos en [OPERACION.md](docs/OPERACION.md).
-- **Google Cloud Run** — [Dockerfile](Dockerfile) + [deploy/cloudrun.sh](deploy/cloudrun.sh): contenedor sin privilegios, claves en Secret Manager, cuenta de servicio de mínimo privilegio, escala a cero y logs estructurados en Cloud Logging. Pasos en [CLOUD_RUN.md](docs/CLOUD_RUN.md).
+- **Google Cloud Run** — [Dockerfile](Dockerfile) + [deploy/cloudrun.sh](deploy/cloudrun.sh): contenedor sin privilegios, claves en Secret Manager, cuenta de servicio de mínimo privilegio, escala a cero, historial compartido en Firestore, logs estructurados y configuración de panel/alertas. Pasos en [CLOUD_RUN.md](docs/CLOUD_RUN.md).
 
 `constraints.txt` fija las versiones verificadas de dependencias. El CI ejecuta las pruebas y además construye la imagen y la prueba como contenedor.
 
 La tarjeta pública de agente es un descriptor experimental; no implementa por sí sola un servidor RPC A2A ni acredita interoperabilidad completa con ese protocolo. Cloud Run está preparado como alternativa, pero el servicio público verificado corre en Render.
-
-[Revisión de entrega y defensa breve](docs/REVISION_ENTREGA.md).

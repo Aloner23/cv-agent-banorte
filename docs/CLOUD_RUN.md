@@ -1,76 +1,91 @@
-# Despliegue en Google Cloud Run
+# Cloud Run: contenedor, estado compartido y observabilidad
 
-El mismo código que corre en Render se publica como contenedor en Cloud Run. Render sigue siendo la vía más simple; Cloud Run muestra cómo operaría el agente en una nube empresarial: imagen reproducible, secretos gestionados, identidad de mínimo privilegio, escalado automático y observabilidad nativa.
+## Estado
+
+Configuración preparada y pruebas locales documentadas. El endpoint actualmente verificado sigue en Render; no se afirma despliegue efectivo en Cloud Run hasta completar la aceptación de abajo.
 
 ## Arquitectura
 
-```
- Plataforma del reto / chat web
-        │  HTTPS · Authorization: Bearer
-        ▼
- Cloud Run (servicio carlos-cv-agent, us-central1)
-   ├─ contenedor python:3.12-slim, usuario sin privilegios (uid 10001)
-   ├─ 0–3 instancias, 20 solicitudes concurrentes por instancia, 512 MiB
-   ├─ variables: proveedor, modelo, límites
-   └─ secretos montados como variables ◀── Secret Manager
-          gemini-api-key, agent-api-key        (sólo los lee la cuenta de servicio)
-        │
-        ├──▶ Gemini API (generativelanguage.googleapis.com)
-        └──▶ Cloud Logging / Cloud Trace (logs JSON, X-Cloud-Trace-Context)
+```mermaid
+flowchart LR
+  C[Cliente del reto / chat] -->|HTTPS y Bearer del agente| R[Cloud Run: FastAPI en contenedor]
+  R --> G[Gemini API]
+  S[Secret Manager] -->|Dos secretos versionados| R
+  R -->|Historial con caducidad| F[Firestore: base cv-agent]
+  R -->|JSON sin textos ni claves| L[Cloud Logging]
+  L --> M[Cloud Monitoring: panel e incidentes]
+  R -->|Métricas de plataforma| M
 ```
 
-## Decisiones
+El contenedor corre con usuario sin privilegios y dependencias fijadas. Cloud Build construye la imagen y Artifact Registry la conserva. `.gcloudignore` limita la carga a archivos de ejecución; `.dockerignore` limita el contexto de imagen. No se envían `.env`, documentos de entrevista, PDF, historial Git ni reportes locales.
 
-| Decisión | Por qué | Costo o límite |
-|---|---|---|
-| `gcloud run deploy --source .` con el `Dockerfile` del repo | Un comando construye en Cloud Build, guarda la imagen en Artifact Registry y despliega; el mismo `Dockerfile` sirve fuera de Google | La primera construcción tarda unos minutos |
-| Claves en **Secret Manager** | No quedan en variables planas, en la consola ni en el historial; se rotan agregando una versión | Hay que dar acceso explícito a la cuenta de servicio |
-| Cuenta de servicio `cv-agent-runtime` | La cuenta por defecto de Compute tiene permisos de editor; ésta sólo lee dos secretos | Un paso más en el despliegue |
-| `--allow-unauthenticated` + Bearer en la aplicación | La plataforma del reto llama con un token Bearer propio, no con identidad de Google; IAM de Cloud Run lo rechazaría | La protección depende de la clave del agente y del límite por IP |
-| `min-instances 0`, `max-instances 3` | Costo cero sin tráfico y techo de gasto ante abuso | Arranque en frío de unos segundos (mucho menor que el plan gratuito de Render) |
-| `concurrency 20`, `timeout 120 s` | El trabajo es esperar al modelo (E/S), no CPU; el timeout supera los 90 s internos | — |
-| Logs JSON con `severity`, `httpRequest` y trace | Cloud Logging los indexa sin agentes extra; se filtra por `request_id`, estado, latencia o tokens | Las métricas de `/metrics` son por instancia |
-| Región `us-central1` | Capa gratuita de Cloud Run y cercanía razonable a México | Se cambia con `REGION=` |
+La cuenta `cv-agent-runtime` sólo recibe lectura de los dos secretos y `roles/datastore.user` condicionado a la base `cv-agent`. La cuenta de construcción es distinta; sus permisos se revisan al desplegar. No se presupone que las cuentas predeterminadas tengan el rol Editor.
 
-## Pasos (Cloud Shell)
+## Continuidad y retención
 
-1. Abrir [Cloud Shell](https://shell.cloud.google.com) con la cuenta que tiene facturación activa.
-2. Seleccionar o crear el proyecto:
-   ```bash
-   gcloud projects create carlos-cv-agent-<sufijo>      # opcional, si no existe
-   gcloud config set project <PROJECT_ID>
-   gcloud billing projects describe <PROJECT_ID>         # billingEnabled: true
-   ```
-3. Clonar y desplegar:
-   ```bash
-   git clone https://github.com/Aloner23/cv-agent-banorte && cd cv-agent-banorte
-   ./deploy/cloudrun.sh
-   ```
-   El script habilita las APIs, crea la cuenta de servicio, pide **una sola vez** las dos claves (sin mostrarlas) y despliega. Es idempotente: volver a correrlo publica una versión nueva.
-4. Registrar en la plataforma del reto la URL base `https://<servicio>.run.app/v1` y la clave del agente, o importar la tarjeta desde `https://<servicio>.run.app`.
+`RESPONSE_STORE_BACKEND=firestore` permite recuperar `previous_response_id` desde otra instancia o revisión. Las consultas usan IDs aleatorios y autenticación del agente; no existe aislamiento entre identidades individuales porque el demostrador comparte una clave. No usar datos privados ni múltiples usuarios empresariales sin ese aislamiento.
 
-## Verificación
+Las conversaciones expiran lógicamente al cabo de una hora: el servidor rechaza lecturas vencidas aunque Firestore todavía conserve el documento. El borrado físico por TTL es asíncrono y normalmente tarda hasta 24 horas adicionales, sin garantía de inmediatez. `store=false` evita escritura; el cliente también puede reenviar la transcripción. Las operaciones de base tienen timeout y no reintentan indefinidamente. Un fallo al persistir produce 503 o `response.failed` en SSE, nunca un éxito con continuidad inexistente.
+
+El límite de 200 registros sólo aplica al backend local en memoria, no a Firestore. El volumen compartido depende de tráfico y retención. La tasa por IP también es local a cada instancia, no una cuota global.
+
+## Despliegue
+
+Requiere proyecto explícito con facturación habilitada y autorización para costos, secretos y permisos. Desde un checkout limpio:
 
 ```bash
-URL=$(gcloud run services describe carlos-cv-agent --region us-central1 --format 'value(status.url)')
-curl -s $URL/health
-curl -s $URL/.well-known/agent-card.json | head -c 300
-read -rs KEY; curl -s $URL/v1/responses -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
-  -d '{"input":"¿Qué proyectos de IA has construido?"}' | python3 -m json.tool | head -40
-curl -s -H "Authorization: Bearer $KEY" $URL/metrics | python3 -m json.tool
+PROJECT_ID=tu-proyecto ./deploy/cloudrun.sh
 ```
 
-## Operación
+El script no cambia el proyecto global de gcloud. Solicita las claves sólo si los secretos no existen y fija sus versiones numéricas. Mantener Render mientras se valida la nueva URL. La API de Gemini sigue siendo la configurada; esto no migra el modelo a Vertex AI.
 
-- **Logs:** Cloud Logging → filtro `resource.type="cloud_run_revision" jsonPayload.message="response"`; campos `status`, `ms`, `ttft_ms`, `input_tokens`, `output_tokens`, `flags`, `request_id`.
-- **Errores:** `severity>=WARNING`; `jsonPayload.error_code` distingue cuota del proveedor (`provider_rate_limit`), timeout y fallos de modelo.
-- **Métricas agregadas:** Cloud Monitoring ya trae solicitudes, latencia, instancias y errores 5xx del servicio; se pueden crear métricas basadas en logs para tokens o guardrails.
-- **Rotar claves:** `printf '%s' "$NUEVA" | gcloud secrets versions add agent-api-key --data-file=-` y redeplegar (`./deploy/cloudrun.sh`).
-- **Volver a una versión anterior:** `gcloud run services update-traffic carlos-cv-agent --region us-central1 --to-revisions <revision>=100`.
-- **Apagar:** `gcloud run services delete carlos-cv-agent --region us-central1`.
+La configuración usa 0–2 instancias, 1 CPU, 512 MiB, concurrencia 20 y timeout 120 s. Son valores iniciales para medir, no límites financieros ni resultados de carga. Escalar a cero puede generar arranque en frío; no se promete una latencia fija. Cloud Build, Artifact Registry, Firestore, Secret Manager, logs y Gemini pueden generar costos aun con poco tráfico. Configurar presupuesto y alertas de facturación; un presupuesto alerta, no detiene por sí solo el consumo.
 
-## Límites
+## Observabilidad reproducible
 
-- El historial para `previous_response_id` vive en memoria de cada instancia: con varias instancias o tras escalar a cero puede no encontrarse. Para la plataforma se usa **reproducción de transcripción**, que no depende de ese estado. Para persistirlo, el siguiente paso sería Firestore o Memorystore.
-- `/metrics` refleja sólo la instancia que atiende; la vista global está en Cloud Monitoring.
-- No es una arquitectura certificada para producción bancaria: faltan, por ejemplo, red privada (VPC-SC), WAF/Cloud Armor y gestión de identidades corporativa.
+```bash
+# Sólo genera JSON revisable, no crea recursos:
+python deploy/observability.py --project tu-proyecto
+# Instala métricas, panel y política:
+python deploy/observability.py --project tu-proyecto --apply
+# Para notificar, proporcionar un canal existente autorizado:
+python deploy/observability.py --project tu-proyecto --channel projects/tu-proyecto/notificationChannels/ID --apply
+```
+
+Panel: solicitudes, instancias, latencia p95, primer texto p95, tokens de entrada/salida p95 por respuesta y fallos terminales. Los percentiles de tokens no equivalen a gasto total; conciliar facturación del proveedor y sumar registros de uso para medir costo. Las métricas por logs se agregan entre instancias y sólo incluyen eventos posteriores a su creación; pueden tardar en aparecer.
+
+La política abre un incidente con tres fallos terminales en cinco minutos; sin canal los incidentes sólo se consultan en la consola. Incluye fallos de SSE aunque el HTTP inicial sea 200. El log `response_failed` y `error_code` permiten distinguir cuota, timeout y almacenamiento. `/metrics` permanece como diagnóstico local por instancia.
+
+Filtro de diagnóstico:
+
+```text
+resource.type="cloud_run_revision"
+resource.labels.service_name="carlos-cv-agent"
+jsonPayload.message="response_failed"
+```
+
+Se correlacionan logs por `request_id` y el identificador de trace entrante. Esto no implica instrumentación completa de spans distribuidos. No registrar preguntas, respuestas, tokens de acceso ni claves en logs.
+
+## Aceptación antes de cambiar el endpoint del reto
+
+- Comprobar `/health`: versión, commit, prompt, corpus y backend `firestore`.
+- Probar JSON, SSE y rechazo 401 sin clave.
+- Crear una respuesta, desplegar otra revisión y continuar mediante su ID: demuestra continuidad entre procesos.
+- Probar `store=false` y caducidad; revisar la política TTL habilitada.
+- Generar una solicitud válida, localizar su `X-Request-ID` en logs y verificar métricas del panel.
+- Ejecutar fallos controlados de proveedor en pruebas locales; cualquier ejercicio real se hace en un servicio de ensayo, sin romper el agente del reto.
+- Identificar revisión anterior y ensayar recuperación antes de retirar Render.
+
+Rollback de tráfico (sustituir los valores):
+
+```bash
+gcloud run services update-traffic carlos-cv-agent --project tu-proyecto --region us-central1 --to-revisions REVISION_ANTERIOR=100
+```
+
+## Referencias
+
+- [Logs de Cloud Run](https://docs.cloud.google.com/run/docs/logging)
+- [Métricas integradas](https://docs.cloud.google.com/run/docs/monitoring)
+- [Afinidad no garantizada entre instancias](https://docs.cloud.google.com/run/docs/configuring/session-affinity)
+- [TTL de Firestore](https://firebase.google.com/docs/firestore/ttl)
+- [Control de acceso por base](https://firebase.google.com/docs/firestore/manage-databases)

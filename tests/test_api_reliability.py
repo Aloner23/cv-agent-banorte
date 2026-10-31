@@ -240,3 +240,34 @@ def test_store_lru_and_ttl(monkeypatch):
     clock[0] = 111.0
     store.put("d", turns, {"id": "d"})
     assert list(store.data) == ["d"]
+
+
+@pytest.mark.parametrize('stream', [False, True])
+def test_failed_persistence_is_not_reported_as_completed(api, monkeypatch, stream):
+    from app.shared_store import StoreUnavailable
+    client, main = api
+    def unavailable(*args):
+        raise StoreUnavailable('private-store-detail')
+    monkeypatch.setattr(main.store, 'put', unavailable)
+    r = client.post('/v1/responses', headers=H, json={'input': 'hola', 'stream': stream})
+    assert 'private-store-detail' not in r.text
+    if stream:
+        payloads = events(r.text)
+        assert any(p['type'] == 'response.failed' and p['response']['error']['code'] == 'store_unavailable' for p in payloads)
+        assert not any(p['type'] == 'response.completed' for p in payloads)
+    else:
+        assert r.status_code == 503
+        assert r.json()['error']['code'] == 'store_unavailable'
+    r = client.post('/v1/responses', headers=H, json={'input': 'hola', 'store': False})
+    assert r.status_code == 200  # Sin persistencia no depende del almacén.
+
+
+def test_history_backend_failure_returns_503(api, monkeypatch):
+    from app.shared_store import StoreUnavailable
+    client, main = api
+    def unavailable(*args):
+        raise StoreUnavailable('private-store-detail')
+    monkeypatch.setattr(main.store, 'get', unavailable)
+    r = client.post('/v1/responses', headers=H, json={'input': 'continúa', 'previous_response_id': 'resp_' + 'a'*32})
+    assert r.status_code == 503
+    assert r.json()['error']['code'] == 'store_unavailable'

@@ -16,7 +16,7 @@ flowchart LR
     G --> O[Control de salida]
     O --> R[JSON o eventos SSE]
     R --> U
-    A <--> M[Historial temporal en memoria]
+    A <--> M[Historial: memoria o Firestore]
 ```
 
 La propuesta comercial derivada se desarrolla en [PROPUESTA_DE_VALOR.md](PROPUESTA_DE_VALOR.md). El demostrador no incorpora aún la arquitectura de identidad y autorización necesaria para consultar perfiles de varios empleados.
@@ -109,7 +109,7 @@ El servidor normaliza referencias agrupadas y elimina ids que no están en el co
 
 Render puede servir la demostración, pero su documentación desaconseja las instancias gratuitas para producción y describe suspensión por inactividad. No se promete latencia constante ni disponibilidad bancaria con ese plan. [Límites oficiales de Render Free](https://render.com/docs/free).
 
-**Evolución.** Si se requiere disponibilidad continua, elegir capacidad apropiada; si se necesitan varias instancias, usar un almacén compartido con permisos, retención y borrado explícitos. Redis es una opción, no una necesidad del CV inicial ni una solución automática de privacidad.
+**Evolución implementada para Cloud Run.** Backend Firestore opcional, con acceso por identidad del servicio, caducidad lógica al leer y política TTL para limpieza física. Permite continuidad entre procesos; las pruebas locales simulan dos clientes y errores de almacenamiento. La prueba real entre revisiones sigue siendo requisito antes de cambiar el endpoint. Se eligió frente a una instancia Redis siempre activa para mantener operación bajo demanda; agrega lecturas, escrituras y costos de retención. Ver [Cloud Run](CLOUD_RUN.md).
 
 ## 10. Evaluar contrato, contenido y utilidad por separado
 

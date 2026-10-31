@@ -275,8 +275,8 @@ class SSE:
 # ---------------------------------------------------------------- memoria de conversaciones
 class ResponseStore:
     """Almacén en memoria (LRU + TTL) para `previous_response_id` y GET /v1/responses/{id}.
-    En producción multi-instancia se reemplazaría por Redis; para este reto una
-    sola instancia es suficiente y evita dependencias."""
+    El backend Firestore opcional se selecciona en main para despliegues
+    con varias instancias; éste se conserva para local y Render."""
 
     def __init__(self, max_items: int = 200, ttl_s: int = 3600):
         self.data: OrderedDict[str, tuple[float, list[Turn], dict]] = OrderedDict()
