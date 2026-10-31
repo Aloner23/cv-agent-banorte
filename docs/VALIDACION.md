@@ -2,13 +2,35 @@
 
 Dependencias fijadas en `constraints.txt`. Las comprobaciones siguientes identifican su revisión: una prueba técnica simulada no acredita calidad del modelo, y una evaluación histórica no se traslada a un nuevo prompt o corpus.
 
-## Auditoría y correcciones · 31 de octubre de 2026
+## Checkpoint del release desplegado · 31 de octubre de 2026, 18:24 UTC
+
+La versión **1.2.1** quedó desplegada con el commit [`aaa48635e964c494b2bfa99331ead92d93b29f3a`](https://github.com/Aloner23/cv-agent-banorte/commit/aaa48635e964c494b2bfa99331ead92d93b29f3a), corpus **`cac6e7ff0fa8`** y prompt **`d3ff749428a6`**. La revisión de Cloud Run **`carlos-cv-agent-00005-viy`** recibió el **100 % del tráfico** después de las comprobaciones siguientes. Este es el SHA del código ejecutado; la actualización posterior de este documento no requiere redesplegar y puede dejar `HEAD` del repositorio por delante del release activo.
+
+| Verificación | Resultado y alcance |
+|---|---|
+| Pruebas técnicas locales | **186 aprobadas** en Python 3.12, con proveedor simulado; no miden calidad del LLM |
+| CI del SHA desplegado | [Ejecución `41229006112`](https://github.com/Aloner23/cv-agent-banorte/actions/runs/41229006112): trabajos `test` y `container` exitosos |
+| Construcción de producción | Cloud Build `ed380622-fbe8-47d3-a793-036e639afb17`: `SUCCESS` |
+| Estado después de promover | `/health` y `/ready`: 200, versión, SHA y corpus esperados en las dos URLs oficiales del servicio; `/ready` declara `local_configuration_only` |
+| JSON real antes de promover | 200 y `completed`; enlace de Cloud Run correcto; respuesta guardada y recuperada desde Firestore |
+| SSE real antes de promover | 200 con `previous_response_id`, 12 eventos en secuencia y cierre `response.completed` seguido de `[DONE]`; enlace al repositorio correcto |
+| Rechazos técnicos | Sin clave: 401; entero JSON de 5000 dígitos: 400 con mensaje sanitizado |
+
+Se hicieron **dos generaciones reales** con Gemini y la configuración existente, sobre la revisión final aún sin tráfico de producción. JSON: request ID `7b45d043584340ab`, 1.148 s, 4008 tokens de entrada y 58 de salida. SSE: request ID `20e094bf58b943a2`, 0.666 s, 4082 tokens de entrada y 39 de salida. Son comprobaciones dirigidas de integración y continuidad, no percentiles de latencia, prueba de carga ni una nueva tasa de calidad. Después se promovió esa misma revisión y se verificaron salud, identidad del release y autenticación en el endpoint habitual.
+
+El commit final añade a las correcciones de `1af0978c15da77bbe338dccfbe0d814eb5ee0dcc` una URL alternativa oficial de Cloud Run en el corpus: la URL que contiene el número de proyecto podía confundirse con un teléfono en el filtro de salida. Se agregó una regresión para preservar los enlaces públicos del corpus, incluso en streaming carácter por carácter; no se debilitó el filtro de privacidad. Esto explica el paso de 185 a **186 pruebas** y de `5f2d27259454` a **`cac6e7ff0fa8`**.
+
+La **evaluación completa de los 38 casos actuales sigue pendiente**. El resultado histórico 33/34 pertenece a otro corpus y no se atribuye a este release. Tampoco se repitió el chat dentro de la plataforma Banorte durante este despliegue ni se modificó el registro del candidato.
+
+Se conservaron la configuración de ejecución, los recursos y las referencias de secretos. Los tags temporales de prueba se retiraron. La revisión anterior `carlos-cv-agent-00003-jqd` quedó disponible como destino de rollback; no fue necesario ejecutarlo.
+
+## Auditoría y correcciones previas al despliegue · 31 de octubre de 2026
 
 Antes de las correcciones se reprodujeron **140 pruebas técnicas aprobadas** sobre el contenido de `4fcd41aeb2a1566ae62d8b61c4fd566ee7948869`. El servicio público informó versión 1.2.0, código `e140ce3021def011b8ffe12421c38608cec222d2`, prompt `d3ff749428a6` y corpus `5e8bacea90d0`; `/v1/models` sin clave devolvió 401. `/health` y `/ready` sólo comprobaron configuración, sin generar una respuesta nueva.
 
 La revisión 1.2.1 corrige el error 500 ante un entero JSON excesivo, endurece los criterios de evaluación de cantidades, fechas y matices económicos, y reconcilia la documentación y la fuente del agente con Cloud Run. El lote histórico de 33/34 utilizó el corpus `00f9aee5320c`, distinto de las revisiones posteriores; no se presenta como exactitud de la versión actual. Las regresiones del evaluador usan respuestas sintéticas para probar sus criterios, no para medir Gemini. Una evaluación completa con el corpus actualizado sigue pendiente.
 
-**185 pruebas técnicas aprobadas** en Python 3.12, sin red ni credenciales reales. La suite dorada tiene ahora **38 casos y 21 rúbricas**, con 40 llamadas al agente y 38 adicionales si se activa el juez. Los casos de rúbrica sin juez permanecen pendientes. El corpus actualizado es `5f2d27259454`; el prompt no cambió. Se conservó la advertencia previa de deprecación de TestClient/httpx. La aceptación del despliegue requiere comprobar el SHA publicado en CI y en `/health`, además de JSON/SSE; estas pruebas locales no acreditan por sí solas esa aceptación.
+En el checkpoint previo, correspondiente a `1af0978c15da77bbe338dccfbe0d814eb5ee0dcc`, se aprobaron **185 pruebas técnicas** en Python 3.12, sin red ni credenciales reales. La suite dorada pasó a **38 casos y 21 rúbricas**, con 40 llamadas al agente y 38 adicionales si se activa el juez. Los casos de rúbrica sin juez permanecen pendientes. El corpus de esa etapa era `5f2d27259454`; el prompt no cambió. Se conservó la advertencia previa de deprecación de TestClient/httpx. En ese momento aún faltaba comprobar el SHA publicado en CI y en `/health`, además de JSON/SSE; la aceptación posterior se documenta en el checkpoint del release desplegado, arriba.
 
 ## Evidencia histórica · 30 de octubre de 2026
 
