@@ -29,7 +29,11 @@ Confirmar los archivos que se incluirán antes del primer push. No incluir clave
 
 El repositorio se creó en la cuenta del titular. La publicación del código y la disponibilidad del endpoint HTTPS son verificaciones independientes.
 
-## 3. Desplegar en Render
+## 3. Despliegue público y alternativa Render
+
+El despliegue público actual utiliza [Cloud Run](CLOUD_RUN.md). La siguiente receta conserva Render como alternativa y respaldo.
+
+### Desplegar en Render
 
 En la cuenta del titular, seleccionar **New → Blueprint** y conectar el repositorio. `render.yaml` fija:
 

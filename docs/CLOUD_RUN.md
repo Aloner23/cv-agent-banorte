@@ -2,7 +2,11 @@
 
 ## Estado
 
-Configuración preparada y pruebas locales documentadas. El endpoint actualmente verificado sigue en Render; no se afirma despliegue efectivo en Cloud Run hasta completar la aceptación de abajo.
+Desplegado y comprobado el 30 de octubre de 2026 (hora de Ciudad de México): [https://carlos-cv-agent-980817940108.us-central1.run.app](https://carlos-cv-agent-980817940108.us-central1.run.app). Banorte utiliza esta URL base con `/v1`. Render se conserva como respaldo.
+
+Versión 1.2.0, código `e140ce3021def011b8ffe12421c38608cec222d2`, región `us-central1`. Se verificaron JSON, SSE, 401 sin clave, `store=false` y continuidad desde la revisión `00002-v8x` a `00003-jqd`. Firestore confirmó TTL `ACTIVE` e índices de `payload` excluidos. Logs reales incluyen request ID, revisión, latencia y tokens sin el texto de la conversación.
+
+El panel y cinco métricas por logs fueron aceptados por Google Monitoring, junto con una política de fallos. Se observaron puntos reales en solicitudes, latencia, primer texto, tokens e instancias; la serie de fallos permanece sin puntos al no haber fallos terminales en estas pruebas. Los incidentes operativos se consultan en la consola: todavía no hay un canal de correo asociado. El presupuesto mensual de **200 MXN** sí tiene alertas de facturación al 50%, 90% y 100%, limitado al proyecto del agente. No es un corte automático del servicio ni cubre una clave de Gemini facturada en otro proyecto.
 
 ## Arquitectura
 
@@ -37,7 +41,7 @@ Requiere proyecto explícito con facturación habilitada y autorización para co
 PROJECT_ID=tu-proyecto ./deploy/cloudrun.sh
 ```
 
-El script no cambia el proyecto global de gcloud. Solicita las claves sólo si los secretos no existen y fija sus versiones numéricas. Mantener Render mientras se valida la nueva URL. La API de Gemini sigue siendo la configurada; esto no migra el modelo a Vertex AI.
+El script no cambia el proyecto global de gcloud. Solicita la caducidad y la exclusión de índices en segundo plano; verificar su estado antes de dar por completada la aceptación. Solicita las claves sólo si los secretos no existen y fija sus versiones numéricas. Mantener Render mientras se valida la nueva URL. La API de Gemini sigue siendo la configurada; esto no migra el modelo a Vertex AI.
 
 La configuración usa 0–2 instancias, 1 CPU, 512 MiB, concurrencia 20 y timeout 120 s. Son valores iniciales para medir, no límites financieros ni resultados de carga. Escalar a cero puede generar arranque en frío; no se promete una latencia fija. Cloud Build, Artifact Registry, Firestore, Secret Manager, logs y Gemini pueden generar costos aun con poco tráfico. Configurar presupuesto y alertas de facturación; un presupuesto alerta, no detiene por sí solo el consumo.
 

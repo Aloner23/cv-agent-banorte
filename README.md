@@ -16,7 +16,7 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 | Modelo | Gemini configurable; predeterminado `gemini-3.5-flash-lite` |
 | Calidad con Gemini real | 34 casos completados; 33 aprobados automáticamente y hallazgos de revisión documentados en [resultados](docs/RESULTADOS_GEMINI.md) |
 | Código público | [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte) |
-| Despliegue HTTPS | Render (plan gratuito) en `https://carlos-cv-agent.onrender.com`; contenedor listo para Cloud Run con Secret Manager ([guía](docs/CLOUD_RUN.md)) |
+| Despliegue HTTPS | Cloud Run en `https://carlos-cv-agent-980817940108.us-central1.run.app`; Render conservado como respaldo ([guía](docs/CLOUD_RUN.md)) |
 | Registro en la plataforma del reto | Registrado y probado en conversaciones del reto; URL base `…/v1` + clave Bearer |
 | Observabilidad | Logs JSON por solicitud (Cloud Logging + Cloud Trace), `X-Request-ID`, métricas en `/metrics` |
 
@@ -50,7 +50,7 @@ flowchart LR
 | Gemini y adaptadores separados | Conserva el avance y desacopla el cliente del proveedor | Cambiar de modelo exige reevaluar; no hay respaldo automático |
 | FastAPI + REST directo | Flujo asíncrono compacto y fácil de inspeccionar | El proyecto mantiene el contrato y el parseo SSE |
 | Evidencia y abstención | Evita presentar una estimación como beneficio comprobado | Las citas son solicitadas al modelo, no verificadas semánticamente por código |
-| Historial configurable | Memoria local en Render; Firestore compartido preparado para Cloud Run | TTL lógico de una hora, borrado físico asíncrono; no hay identidad individual por visitante |
+| Historial configurable | Firestore compartido en Cloud Run; memoria local en Render | TTL lógico de una hora, borrado físico asíncrono; no hay identidad individual por visitante |
 
 El modelo predeterminado se actualizó porque Google limita el acceso a Gemini 2.5 a usuarios anteriores y recomienda modelos recientes para proyectos nuevos. `gemini-3.5-flash-lite` aparece como estable; la disponibilidad para una cuenta concreta se debe comprobar con una llamada real. No se afirma que sea el mejor modelo sin evaluación. [Catálogo oficial](https://ai.google.dev/gemini-api/docs/models), [ficha del modelo](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
 
@@ -147,4 +147,4 @@ Dos destinos con el mismo código:
 
 `constraints.txt` fija las versiones verificadas de dependencias. El CI ejecuta las pruebas y además construye la imagen y la prueba como contenedor.
 
-La tarjeta pública de agente es un descriptor experimental; no implementa por sí sola un servidor RPC A2A ni acredita interoperabilidad completa con ese protocolo. Cloud Run está preparado como alternativa, pero el servicio público verificado corre en Render.
+La tarjeta pública de agente es un descriptor experimental; no implementa por sí sola un servidor RPC A2A ni acredita interoperabilidad completa con ese protocolo. El servicio público verificado corre en Cloud Run; Render conserva la versión 1.1.1 como respaldo.

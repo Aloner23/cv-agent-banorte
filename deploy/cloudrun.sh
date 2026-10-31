@@ -40,10 +40,10 @@ gcloud firestore databases describe --database "$DATABASE" --project "$PROJECT_I
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member "serviceAccount:$SA_EMAIL" --role roles/datastore.user \
   --condition="expression=resource.name==\"projects/${PROJECT_ID}/databases/${DATABASE}\",title=cv-agent-database" >/dev/null
 gcloud firestore fields ttls update expires_at --collection-group=cv_responses --database "$DATABASE" \
-  --enable-ttl --project "$PROJECT_ID" --quiet
+  --enable-ttl --async --project "$PROJECT_ID" --quiet
 # Evitar índices de contenido conversacional (no se consulta por contenido).
 gcloud firestore indexes fields update payload --collection-group=cv_responses --database "$DATABASE" \
-  --disable-indexes --project "$PROJECT_ID" --quiet
+  --disable-indexes --async --project "$PROJECT_ID" --quiet
 
 gcloud run deploy "$SERVICE" --source . --project "$PROJECT_ID" --region "$REGION" \
   --service-account "$SA_EMAIL" --allow-unauthenticated \
