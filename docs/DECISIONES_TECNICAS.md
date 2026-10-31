@@ -99,17 +99,15 @@ El servidor normaliza referencias agrupadas y elimina ids que no están en el co
 
 **Controles para un piloto interno.** Identidad corporativa, permisos por documento, cuotas por usuario, rotación de secretos, reglas de retención, revisión del tratamiento de datos y pruebas de fuga entre usuarios. No se declara cumplimiento bancario por usar un proveedor conocido o por añadir un prompt de seguridad.
 
-## 9. Memoria temporal y despliegue de una instancia
+## 9. Estado compartido y ejecución serverless
 
-**Decisión.** Mantener la continuidad mediante `previous_response_id` y un almacén en memoria con caducidad y capacidad limitada. Conservar la configuración de despliegue en [render.yaml](../render.yaml).
+**Decisión.** Cloud Run ejecuta el contenedor y Firestore conserva temporalmente las conversaciones consultadas mediante `previous_response_id`. La identidad del servicio accede sólo a la base `cv-agent` y a sus dos secretos. Render y el backend en memoria quedan como alternativa de desarrollo y respaldo.
 
-**Por qué.** Para el reto evita infraestructura adicional y permite demostrar varios turnos. La configuración versionada hace revisable el arranque del servicio.
+**Por qué.** Una instancia serverless puede desaparecer o ser reemplazada al publicar otra revisión. Separar el estado permite continuar la conversación sin depender de un proceso específico. Se comprobó con una respuesta creada en la revisión `00002-v8x` y recuperada mediante SSE en `00003-jqd`.
 
-**Costo y límite.** Reiniciar pierde la memoria; varias instancias no comparten el estado. La caducidad de acceso no equivale a una política completa de eliminación de datos. Un único secreto del endpoint es adecuado para una integración controlada, pero no identifica a cada visitante del chat.
+**Costo y límite.** Firestore agrega lecturas, escrituras y retención, pero evita mantener una instancia Redis siempre encendida para este volumen. El historial caduca lógicamente al cabo de una hora y la política TTL activa solicita su limpieza física asíncrona. `store=false` evita almacenarlo. Un fallo de persistencia se comunica como error, no como éxito con continuidad inexistente.
 
-Render puede servir la demostración, pero su documentación desaconseja las instancias gratuitas para producción y describe suspensión por inactividad. No se promete latencia constante ni disponibilidad bancaria con ese plan. [Límites oficiales de Render Free](https://render.com/docs/free).
-
-**Evolución implementada para Cloud Run.** Backend Firestore opcional, con acceso por identidad del servicio, caducidad lógica al leer y política TTL para limpieza física. Permite continuidad entre procesos; las pruebas locales simulan dos clientes y errores de almacenamiento. La prueba real entre revisiones sigue siendo requisito antes de cambiar el endpoint. Se eligió frente a una instancia Redis siempre activa para mantener operación bajo demanda; agrega lecturas, escrituras y costos de retención. Ver [Cloud Run](CLOUD_RUN.md).
+El secreto compartido autentica la integración, no a cada visitante. Antes de incorporar datos internos o múltiples perfiles se requieren identidad individual, aislamiento y permisos. El backend en memoria de Render pierde historial al reiniciar y no comparte estado entre procesos. Ver [Cloud Run](CLOUD_RUN.md).
 
 ## 10. Evaluar contrato, contenido y utilidad por separado
 
@@ -141,7 +139,7 @@ La entrega se considera lista cuando el perfil esté cotejado y autorizado, las 
 
 **Tarjeta de agente A2A.** `/.well-known/agent-card.json` describe al agente, su habilidad, el esquema Bearer y la URL Open Responses. Permite que una plataforma lo registre a partir de la URL. No existe una convención publicada para enlazar Open Responses desde A2A; se usan los campos estándar (`url`, `additionalInterfaces`) y una extensión que apunta a la especificación.
 
-**Un contenedor, dos destinos.** El `Dockerfile` (usuario sin privilegios, dependencias fijadas, sólo código y conocimiento) corre en Cloud Run y en cualquier runtime OCI. Render se mantiene como la vía más simple; Cloud Run añade Secret Manager, cuenta de servicio de mínimo privilegio, escalado a cero con techo de instancias y observabilidad nativa. Detalle en [CLOUD_RUN.md](CLOUD_RUN.md).
+**Un contenedor, dos destinos.** El `Dockerfile` (usuario sin privilegios, dependencias fijadas, sólo código y conocimiento) corre en Cloud Run y en cualquier runtime OCI. Render se conserva como respaldo; el despliegue actual en Cloud Run incorpora Secret Manager, cuenta de servicio de mínimo privilegio, escalado a cero con techo de instancias y observabilidad nativa. Detalle en [CLOUD_RUN.md](CLOUD_RUN.md).
 
 **Observabilidad sin contenido.** Cada solicitud tiene `X-Request-ID` y, en Cloud Run, se correlaciona con Cloud Trace. Los logs JSON registran estado, latencia total, tiempo al primer token, tokens, guardrails activados y códigos de error; nunca textos de usuario, respuestas ni credenciales. `/metrics` (protegido) resume la instancia: p50/p95, tokens, errores y parámetros ignorados. Es deliberadamente en memoria: la vista agregada corresponde a Cloud Logging/Monitoring, no a una base de datos propia.
 
