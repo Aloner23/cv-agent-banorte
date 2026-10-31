@@ -101,7 +101,7 @@ Antes de declarar entrega completa:
 - [x] Pruebas técnicas pasan con las dependencias fijadas.
 - [x] Repositorio público accesible desde fuera de la sesión del titular.
 - [x] Gemini configurado y probado realmente; consultas de demostración completadas.
-- [ ] Endpoint HTTPS responde con y sin streaming y mantiene varios turnos.
+- [x] Endpoint HTTPS responde con y sin streaming y mantiene varios turnos (versión 1.1.1 verificada).
 - [x] Evaluación de 34 casos revisada, con fallos y límites explícitos.
 - [x] Agente registrado y funcionando dentro de la plataforma del reto Banorte.
 - [x] Guion de demo preparado con resultados actuales; falta realizar la presentación.

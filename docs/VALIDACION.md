@@ -79,3 +79,7 @@ Se revisó la conversación del agente registrado en Banorte: perfil, proyectos,
 La versión 1.1.1 mejora cierres conversacionales, enlaces de contacto y fechas individuales. Corrige el tratamiento de enlaces cuyo texto coincide con un identificador de fuente, incluso fragmentados en streaming. `/health` identifica versión, commit válido, prompt y corpus para distinguir lo evaluado de lo desplegado.
 
 **134 pruebas técnicas pasan**. Se ejecutaron además tres consultas reales con el prompt revisado: contacto con enlaces, fechas separadas de ambas carreras y aficiones ausentes. La revisión manual confirmó esos tres comportamientos y ausencia de preguntas finales repetitivas. El reporte local es `evals/results/revision-conversacion.json` (excluido de Git). El lote completo de 34 casos corresponde a una revisión anterior: no se atribuye su puntuación a este nuevo prompt.
+
+### Comprobación posterior al despliegue
+
+Render desplegó correctamente el commit `a012b857dde0e2a0c661b9b28a49bab4b6d61d6f` (versión 1.1.1). CI de GitHub terminó con éxito. El endpoint público devolvió prompt `d3ff749428a6` y corpus `5e8bacea90d0`. Dos solicitudes autenticadas JSON comprobaron enlaces de contacto y fechas 2018–2023 / 2018–2024; una tercera solicitud SSE con `previous_response_id` identificó ITAM como institución de ambas carreras y terminó en `response.completed`. Reporte local: `evals/results/verificacion-publica-1.1.1.json`. Estas tres respuestas son pruebas dirigidas, no una nueva evaluación completa de 34 casos.
