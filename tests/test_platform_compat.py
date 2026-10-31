@@ -125,6 +125,16 @@ def test_metrics_require_auth(client):
     assert client.get("/metrics").status_code == 401
 
 
+@pytest.mark.parametrize('value,expected', [('a' * 40, 'a' * 40), ('accidental-secret', None)])
+def test_health_exposes_only_valid_build_revision(client, monkeypatch, value, expected):
+    monkeypatch.setenv('RENDER_GIT_COMMIT', value)
+    state = client.get('/health').json()
+    assert state['code_revision'] == expected
+    assert state['version'] == '1.1.1'
+    assert len(state['prompt_revision']) == 12
+    assert 'accidental-secret' not in json.dumps(state)
+
+
 def test_metrics_count_responses_tokens_and_ignored_params(client):
     post(client)
     post(client, reasoning={"effort": "low"})

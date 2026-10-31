@@ -10,14 +10,14 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 
 | Componente | Estado |
 |---|---|
-| Código, chat y endpoint textual | Implementados y comprobados localmente |
+| Código, chat y endpoint textual | Implementados; servicio público y conversaciones en el cliente del reto comprobados |
 | Base de conocimiento | Seis documentos cotejados con el CV aportado; no verificación externa de logros |
 | Pruebas de servidor y proveedor | Sin red, con respuestas controladas; ver [VALIDACION.md](docs/VALIDACION.md) |
 | Modelo | Gemini configurable; predeterminado `gemini-3.5-flash-lite` |
 | Calidad con Gemini real | 34 casos completados; 33 aprobados automáticamente y hallazgos de revisión documentados en [resultados](docs/RESULTADOS_GEMINI.md) |
 | Código público | [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte) |
 | Despliegue HTTPS | Render (plan gratuito) en `https://carlos-cv-agent.onrender.com`; contenedor listo para Cloud Run con Secret Manager ([guía](docs/CLOUD_RUN.md)) |
-| Registro en la plataforma del reto | URL base `…/v1` + clave Bearer; tarjeta A2A en `/.well-known/agent-card.json` |
+| Registro en la plataforma del reto | Registrado y probado en conversaciones del reto; URL base `…/v1` + clave Bearer |
 | Observabilidad | Logs JSON por solicitud (Cloud Logging + Cloud Trace), `X-Request-ID`, métricas en `/metrics` |
 
 ## Lectura para el evaluador
@@ -82,7 +82,7 @@ No publicar `.env` ni introducir la clave de Gemini en el chat web. El archivo e
 uvicorn app.main:app --env-file .env --host 127.0.0.1 --port 8000
 ```
 
-`--env-file` carga configuración sin ejecutar el contenido como código de shell. `/health` muestra el proveedor y la revisión del corpus. `/ready` valida sólo configuración local: aunque devuelva 200, todavía hay que probar conectividad, cuota y respuesta real.
+`--env-file` carga configuración sin ejecutar el contenido como código de shell. `/health` muestra el proveedor y las revisiones de código, prompt y corpus. `/ready` valida sólo configuración local: aunque devuelva 200, todavía hay que probar conectividad, cuota y respuesta real.
 
 ## Contrato de integración
 
@@ -147,3 +147,7 @@ Dos destinos con el mismo código:
 - **Google Cloud Run** — [Dockerfile](Dockerfile) + [deploy/cloudrun.sh](deploy/cloudrun.sh): contenedor sin privilegios, claves en Secret Manager, cuenta de servicio de mínimo privilegio, escala a cero y logs estructurados en Cloud Logging. Pasos en [CLOUD_RUN.md](docs/CLOUD_RUN.md).
 
 `constraints.txt` fija las versiones verificadas de dependencias. El CI ejecuta las pruebas y además construye la imagen y la prueba como contenedor.
+
+La tarjeta pública de agente es un descriptor experimental; no implementa por sí sola un servidor RPC A2A ni acredita interoperabilidad completa con ese protocolo. Cloud Run está preparado como alternativa, pero el servicio público verificado corre en Render.
+
+[Revisión de entrega y defensa breve](docs/REVISION_ENTREGA.md).

@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import hashlib
 import json
 import logging
+import os
+import re
 import time
 from collections import OrderedDict, deque
 
@@ -12,7 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from .agent import CVAgent, InputError, Turn
+from .agent import CVAgent, InputError, Turn, SYSTEM_PROMPT
 from .config import ROOT, get_settings
 from .observability import Metrics, configure_logging, new_request_context
 from .openresponses import (
@@ -41,7 +44,7 @@ metrics = Metrics()
 titles = {d.doc_id: d.title for d in agent.kb.docs}
 _hits: OrderedDict[str, deque] = OrderedDict()
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 app = FastAPI(title="Carlos Alonso · CV Agent", version=APP_VERSION, docs_url="/docs")
 if settings.cors_origins:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
@@ -131,8 +134,12 @@ def home():
 @app.get("/health")
 def health():
     reasons = _readiness_reasons()
+    revision = os.getenv("RENDER_GIT_COMMIT") or os.getenv("APP_REVISION", "")
     return {
         "status": "ok",
+        "version": APP_VERSION,
+        "code_revision": revision if re.fullmatch(r"[0-9a-f]{40}", revision) else None,
+        "prompt_revision": hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest()[:12],
         "ready": not reasons,
         "readiness_reasons": reasons,
         "readiness_check": "local_configuration_only",

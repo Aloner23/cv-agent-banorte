@@ -36,9 +36,9 @@ Abrir [VALIDACION.md](VALIDACION.md) y el reporte correspondiente. Indicar cuán
 
 «Separé pruebas técnicas reproducibles de una evaluación de contenido con 34 casos. Un endpoint en modo simulado no puede pasar como evaluación del modelo. Los casos cubren información ausente, falsas premisas, varios turnos y matices económicos. El juez LLM es una señal adicional, con revisión humana de casos críticos.»
 
-Si todavía no hay evaluación real: «La infraestructura pasó las pruebas locales. La calidad con Gemini y la integración en Banorte siguen pendientes; no presento resultados que aún no he medido.»
+«La suite técnica actual pasa 134 pruebas. Una evaluación anterior completó 34 casos con Gemini: 33 pasaron automáticamente, pero la revisión humana encontró errores adicionales. Después corregí controles y estilo, y repetí los casos afectados. No traslado el porcentaje anterior a cada nuevo prompt. El servicio ya responde desde Render y revisé las conversaciones realizadas en la plataforma del reto.»
 
-Si ya se realizó: sustituir esa frase por fecha, modelo, revisión del corpus, numerador/denominador, fallos encontrados y correcciones. No reutilizar resultados después de cambiar prompt, conocimiento o modelo sin evaluar el impacto.
+Mostrar `/health` para identificar la versión que se está demostrando y mencionar que las últimas verificaciones de estilo son tres consultas dirigidas, no una nueva evaluación completa.
 
 ## 5:00–6:00 · Negocio y siguiente decisión
 
@@ -98,4 +98,4 @@ Que localizar experiencia sea un problema frecuente y costoso, que exista eviden
 4. ¿Hay una prueba de aceptación o ejemplos de requests para la integración?
 5. ¿Qué evidencia esperan para disponibilidad, evaluación y demo, y cuál es la fecha límite?
 
-El contenido del agente Guía requiere acceso a la plataforma. No se presume haberlo consultado sólo por haber abierto la página de inicio de sesión.
+La conversación con el agente Guía ya fue consultada. Indicó que tecnologías como MCP o múltiples agentes son opcionales y no aportó un contrato técnico exhaustivo. La integración se comprobó con conversaciones reales; las preguntas restantes sirven para aclarar criterios o fecha de entrega, sin inventar requisitos.

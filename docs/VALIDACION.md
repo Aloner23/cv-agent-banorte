@@ -6,7 +6,7 @@ Revisión: **30 de octubre de 2026**, entorno local de Carlos. Python 3.12.14. D
 
 | Verificación | Resultado | Alcance |
 |---|---|---|
-| Suite `pytest` | **102 pruebas aprobadas** | Servidor, contrato textual, memoria, privacidad numérica, errores y adaptador Gemini con HTTP simulado |
+| Suite `pytest` | **134 pruebas aprobadas** | Servidor, contrato textual, memoria, privacidad numérica, errores y adaptador Gemini con HTTP simulado |
 | Prueba HTTP del servicio en marcha | **3/3 casos técnicos aprobados** | Rol, formación y dos turnos; proveedor `mock` |
 | Navegador de escritorio | Verificado | Envío, recepción SSE, referencia visual a una sección y nueva conversación |
 | Vista móvil 390 px | Verificada | Sin desbordamiento horizontal; composición y lectura del chat |
@@ -47,7 +47,7 @@ Después de los cambios, se repitieron los tres casos de inyección y se inspecc
 ## Qué cubren las pruebas añadidas
 
 - Rechazo de tipos inválidos, mensajes no textuales, herramientas no soportadas, cuerpos demasiado grandes y modelos públicos desconocidos.
-- Presupuesto efectivo de salida, tiempo total, límites de historial y rechazo explícito de truncación no implementada.
+- Presupuesto efectivo de salida, tiempo total, límites de historial y truncación automática sólo cuando el cliente la solicita.
 - API key, límites por IP observada, CORS, errores terminales en SSE y respuestas incompletas por presupuesto.
 - Expiración, capacidad y continuidad del almacén de respuestas; `store=false`.
 - Estado de proceso frente a configuración lista; el modo simulado no puede presentarse como un modelo real disponible.
@@ -60,8 +60,8 @@ Después de los cambios, se repitieron los tres casos de inyección y se inspecc
 
 1. Aprobación integral de calidad: se completaron 34 casos con Gemini; el resultado automático fue 33/34 y la revisión identificó defectos adicionales. No se afirma ausencia de alucinaciones.
 2. Una evaluación independiente: el juez usa el mismo modelo y omitió problemas de tono, referencias y precisión.
-3. Disponibilidad HTTPS, credencial y cuota en una cuenta de alojamiento.
-4. Compatibilidad con el cliente exacto de Banorte: requiere registro y conversación dentro de su plataforma.
+3. Disponibilidad sostenida o garantía de servicio: HTTPS y una respuesta autenticada de Gemini sí se comprobaron en Render.
+4. Compatibilidad con todas las variantes futuras del cliente: sí se revisaron conversaciones reales del agente registrado en la plataforma de Banorte.
 5. Conformidad completa con toda la especificación Open Responses o con todos los SDKs.
 6. Ahorro económico, mejora de reclutamiento, beneficio para Banorte o validación externa de los hechos del CV.
 7. Protección universal contra inyección, fuga de cualquier formato de dato o aislamiento entre usuarios.
@@ -71,3 +71,11 @@ Después de los cambios, se repitieron los tres casos de inyección y se inspecc
 Ejecutar la suite con modelo, configuración y corpus identificados; revisar los fallos y una muestra de respuestas correctas. El modo calidad registra la revisión del corpus del endpoint; para el juez, exige que coincida con el corpus local. Su resultado no se puede trasladar automáticamente a otro modelo o a una revisión posterior del perfil.
 
 Las reglas léxicas comprueban señales; no interpretan por completo negaciones, atribución o causalidad. Los casos de negocio y credenciales ausentes deben revisarse manualmente. El juez LLM también puede equivocarse, especialmente si comparte proveedor con el agente. Publicar resultados junto con las limitaciones que realmente aplican.
+
+## Revisión posterior a las pruebas del usuario · 30/10/2026
+
+Se revisó la conversación del agente registrado en Banorte: perfil, proyectos, falsas premisas, sueldo no documentado, cambio de identidad, estudios, intereses y contacto. Se verificó además HTTPS y una respuesta autenticada de Gemini en Render. Esta observación acredita la integración utilizada, no conformidad universal del protocolo.
+
+La versión 1.1.1 mejora cierres conversacionales, enlaces de contacto y fechas individuales. Corrige el tratamiento de enlaces cuyo texto coincide con un identificador de fuente, incluso fragmentados en streaming. `/health` identifica versión, commit válido, prompt y corpus para distinguir lo evaluado de lo desplegado.
+
+**134 pruebas técnicas pasan**. Se ejecutaron además tres consultas reales con el prompt revisado: contacto con enlaces, fechas separadas de ambas carreras y aficiones ausentes. La revisión manual confirmó esos tres comportamientos y ausencia de preguntas finales repetitivas. El reporte local es `evals/results/revision-conversacion.json` (excluido de Git). El lote completo de 34 casos corresponde a una revisión anterior: no se atribuye su puntuación a este nuevo prompt.

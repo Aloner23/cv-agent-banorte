@@ -20,6 +20,22 @@ class Deltas:
             yield delta
 
 
+@pytest.mark.parametrize('mode', ['inline', 'hidden'])
+def test_source_named_markdown_link_survives_all_stream_boundaries(mode):
+    raw = 'Consulta [perfil](https://example.test/perfil).'
+    subject = CVAgent(Settings(llm_provider='mock', citation_display=mode))
+    request = AgentRequest(turns=[Turn('user', 'perfil')])
+
+    async def run():
+        for split in range(1, len(raw)):
+            subject.provider = Deltas([raw[:split], raw[split:]])
+            usage = {}
+            assert ''.join([d async for d in subject.stream(request, usage)]) == raw
+            assert usage['citations'] == []
+
+    asyncio.run(run())
+
+
 def agent(**kwargs):
     return CVAgent(Settings(llm_provider="mock", **kwargs))
 

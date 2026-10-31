@@ -103,5 +103,5 @@ Antes de declarar entrega completa:
 - [x] Gemini configurado y probado realmente; consultas de demostración completadas.
 - [ ] Endpoint HTTPS responde con y sin streaming y mantiene varios turnos.
 - [x] Evaluación de 34 casos revisada, con fallos y límites explícitos.
-- [ ] Agente registrado y funcionando dentro de Banorte.
-- [ ] Demo preparada con resultados actuales, sin secretos en pantalla.
+- [x] Agente registrado y funcionando dentro de la plataforma del reto Banorte.
+- [x] Guion de demo preparado con resultados actuales; falta realizar la presentación.
