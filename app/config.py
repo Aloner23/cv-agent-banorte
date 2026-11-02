@@ -22,6 +22,10 @@ class Settings:
     openai_api_key: str = field(default_factory=lambda: _env("OPENAI_API_KEY"))
     gemini_api_key: str = field(default_factory=lambda: _env("GEMINI_API_KEY"))
 
+    demo_enabled: bool = field(default_factory=lambda: _env("DEMO_ENABLED", "false").lower() == "true")
+    demo_daily_limit: int = field(default_factory=lambda: int(_env("DEMO_DAILY_LIMIT", "80")))
+    demo_minute_limit: int = field(default_factory=lambda: int(_env("DEMO_MINUTE_LIMIT", "8")))
+
     # Seguridad del endpoint público
     agent_api_key: str = field(default_factory=lambda: _env("AGENT_API_KEY"))
     rate_limit_per_minute: int = field(default_factory=lambda: int(_env("RATE_LIMIT_PER_MINUTE", "30")))
@@ -52,7 +56,7 @@ class Settings:
     public_base_url: str = field(default_factory=lambda: _env("PUBLIC_BASE_URL"))
 
     def __post_init__(self):
-        for name in ("rate_limit_per_minute", "max_input_chars", "max_history_turns", "max_history_chars",
+        for name in ("demo_daily_limit", "demo_minute_limit", "rate_limit_per_minute", "max_input_chars", "max_history_turns", "max_history_chars",
                      "max_output_tokens", "max_request_bytes", "request_timeout_seconds",
                      "response_store_max_items", "response_store_ttl_seconds", "retrieval_top_k"):
             if getattr(self, name) <= 0 or not math.isfinite(getattr(self, name)):

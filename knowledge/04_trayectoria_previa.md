@@ -4,7 +4,10 @@ title: Trayectoria en datos, desarrollo e innovación (Ingenico, IBSO, ITAM, BBV
 tags: [experiencia previa, antes, anterior, empleos, empresas, previous jobs, career, trayectoria, ingenico, ibso, itam, becario, data analyst, full-stack, bi, power bi, dotnet, sap, spark, sentimiento]
 ---
 # Ingenico · Analyst Sr. IRP · Data Analyst (dic. 2023 – ene. 2024)
-Unificó dos sistemas de inventario para operaciones de reparación entre Estados Unidos y México; diseñó flujos ETL, controles de validación y tableros de Power BI para mejorar integridad, trazabilidad y visibilidad operativa.
+- Proyecto: unificación de dos sistemas de inventario para operaciones de reparación entre Estados Unidos y México.
+- Herramienta documentada en Ingenico: Power BI, utilizada para tableros.
+- Trabajo técnico documentado en Ingenico: diseño de flujos ETL y controles de validación para mejorar integridad, trazabilidad y visibilidad operativa.
+- El CV no especifica qué lenguaje o plataforma de ETL utilizó en Ingenico; no atribuirle aquí las herramientas descritas bajo IBSO.
 
 # IBSO · Analista BI · Desarrollador Full-Stack (ago. 2022 – nov. 2023)
 - Desarrolló para Dormimundo una solución de inventario, logística y resurtido con .NET Framework y SQL Server, integrada con SAP para sincronización y seguimiento operativo.

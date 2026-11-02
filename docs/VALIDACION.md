@@ -1,5 +1,14 @@
 # Evidencia de validación
 
+## Demo web 1.3.0 · 2 de noviembre de 2026
+
+- **206 pruebas técnicas aprobadas** localmente con Python 3.12; proveedor simulado. Incluyen 20 casos nuevos para la demo pública: autenticación de la API preservada, acceso sin credencial a la demo, ausencia de persistencia, campos privilegiados rechazados, límites, cuota concurrente y cierre ante fallo del contador.
+- Respuesta real de PGMM en el nuevo chat local y conversación de perfil en la plataforma del reto sobre el Cloud Run anterior. Capturas y alcance en [DEMO_WEB.md](DEMO_WEB.md).
+- Lote completo anterior: 38 casos, 40 llamadas al agente y 38 al juez, versión 1.2.1, prompt `d3ff749428a6`, corpus `cac6e7ff0fa8`. 38 reglas aprobadas, cero errores de servicio; p50 0.95 s, p95 1.34 s en ese lote, no SLO.
+- Repetición focalizada local tras el ajuste: tres consultas de PGMM en inglés mantuvieron idioma y cifras; la continuación de Ingenico recuperó Power BI y separó IBSO; la certificación ausente se reconoció como no documentada. Son seis respuestas observadas, no una evaluación completa del nuevo prompt. Persistió detalle innecesario sobre IBSO y una formulación ambigua sobre Power BI/ETL: la concisión y la atribución fina siguen siendo límites a revisar.
+- La revisión detectó una cifra mal escrita en inglés y ambigüedad de referente entre empresas que el juez del mismo modelo no señaló. El porcentaje automático no debe presentarse como fidelidad perfecta. La versión 1.3.0 refuerza idioma, precisión numérica y continuidad; no hereda la puntuación del lote anterior.
+
+
 Dependencias fijadas en `constraints.txt`. Las comprobaciones siguientes identifican su revisión: una prueba técnica simulada no acredita calidad del modelo, y una evaluación histórica no se traslada a un nuevo prompt o corpus.
 
 ## Checkpoint del release desplegado · 31 de octubre de 2026, 18:24 UTC

@@ -48,7 +48,7 @@ gcloud firestore indexes fields update payload --collection-group=cv_responses -
 gcloud run deploy "$SERVICE" --source . --project "$PROJECT_ID" --region "$REGION" \
   --service-account "$SA_EMAIL" --allow-unauthenticated \
   --cpu 1 --memory 512Mi --concurrency 20 --min-instances 0 --max-instances 2 --timeout 120 \
-  --set-env-vars "LLM_PROVIDER=gemini,LLM_MODEL=${LLM_MODEL},KNOWLEDGE_MODE=full,MAX_HISTORY_TURNS=30,MAX_HISTORY_CHARS=40000,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},RESPONSE_STORE_BACKEND=firestore,FIRESTORE_DATABASE=${DATABASE},APP_REVISION=${REVISION},LOG_FORMAT=json" \
+  --set-env-vars "DEMO_ENABLED=true,DEMO_DAILY_LIMIT=80,DEMO_MINUTE_LIMIT=8,LLM_PROVIDER=gemini,LLM_MODEL=${LLM_MODEL},KNOWLEDGE_MODE=full,MAX_HISTORY_TURNS=30,MAX_HISTORY_CHARS=40000,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},RESPONSE_STORE_BACKEND=firestore,FIRESTORE_DATABASE=${DATABASE},APP_REVISION=${REVISION},LOG_FORMAT=json" \
   --set-secrets "GEMINI_API_KEY=cv-agent-gemini-key:${GEMINI_VERSION},AGENT_API_KEY=cv-agent-access-key:${AGENT_VERSION}"
 URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
 gcloud run services update "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --update-env-vars "PUBLIC_BASE_URL=${URL}" >/dev/null

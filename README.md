@@ -4,7 +4,9 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 
 **Propuesta de valor:** reducir la fricción entre leer un perfil y encontrar evidencia útil para una conversación profesional. La posible evolución a descubrimiento de capacidades internas se plantea como un piloto por validar, no como una solución ya implantada.
 
-![Interfaz del agente en modo demostración](docs/images/demo-desktop.png)
+**[Abrir demostración guiada y chat sin clave](https://carlos-cv-agent-c7eqmk6ara-uc.a.run.app/demo)** · Arquitectura, decisiones, capturas, validación, operación y propuesta de valor.
+
+![Respuesta real de Gemini en la demo](web/captures/chat.png)
 
 ## Estado de la entrega
 
@@ -14,7 +16,7 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 | Base de conocimiento | Seis documentos cotejados con el CV aportado; no verificación externa de logros |
 | Pruebas de servidor y proveedor | Sin red, con respuestas controladas; ver [VALIDACION.md](docs/VALIDACION.md) |
 | Modelo | Gemini configurable; predeterminado `gemini-3.5-flash-lite` |
-| Calidad con Gemini real | Lote histórico: 34 casos completados, 33 aprobados automáticamente y hallazgos humanos adicionales; no es la puntuación del prompt/corpus actual. Ver [resultados](docs/RESULTADOS_GEMINI.md) |
+| Calidad con Gemini real | Lote del 2 de noviembre: 38 casos con reglas aprobadas; revisión humana detectó errores de cifra y referente. No equivale a 100% de calidad. Ver [validación](docs/VALIDACION.md) |
 | Código público | [Aloner23/cv-agent-banorte](https://github.com/Aloner23/cv-agent-banorte) |
 | Despliegue HTTPS | Cloud Run en `https://carlos-cv-agent-980817940108.us-central1.run.app`; Render conservado como respaldo ([guía](docs/CLOUD_RUN.md)) |
 | Registro en la plataforma del reto | Registrado y probado en conversaciones del reto; URL base `…/v1` + clave Bearer |
@@ -40,7 +42,9 @@ flowchart LR
     G --> O[Redacción de teléfonos]
     O --> R[JSON o SSE con estado terminal]
     R --> C
-    P <--> M[Historial temporal: TTL + LRU]
+    P <--> M[Firestore: TTL lógico de una hora]
+    D[Demo pública sin clave] --> Q[Contrato acotado + cuota global Firestore]
+    Q --> X
 ```
 
 | Decisión | Razón | Límite asumido |
@@ -62,10 +66,12 @@ Requiere Python **3.12**. Desde la raíz del repositorio:
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt -c constraints.txt
-LLM_PROVIDER=mock uvicorn app.main:app --host 127.0.0.1 --port 8000
+DEMO_ENABLED=true LLM_PROVIDER=mock uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 Abrir `http://127.0.0.1:8000`. El modo `mock` devuelve extractos de la fuente y se identifica en pantalla: permite probar el servicio sin clave, pero no demuestra razonamiento ni calidad del modelo.
+
+La demo usa `/demo/chat`: no acepta claves, `previous_response_id`, instrucciones ni campos privilegiados. Conserva hasta cuatro intercambios en la pestaña y usa `store=false`. El chat técnico original sigue en `/chat` y usa la API autenticada. Para habilitar el chat de la demo: `DEMO_ENABLED=true`. En Cloud Run, el script activa un cupo compartido de 80 consultas/día UTC y 8/minuto mediante una transacción de Firestore. [Contrato y límites](docs/DEMO_WEB.md).
 
 ## Conectar Gemini
 

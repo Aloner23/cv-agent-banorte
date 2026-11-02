@@ -22,6 +22,7 @@ class FirestoreResponseStore:
         if client is None:
             from google.cloud import firestore
             client = firestore.Client(project=project, database=database)
+        self.client = client
         self.collection = client.collection(collection)
         self.ttl = ttl_s
 

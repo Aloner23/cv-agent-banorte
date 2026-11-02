@@ -12,6 +12,8 @@ import time
 from collections import OrderedDict, deque
 
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
+from .demo import DemoQuota, DemoLimit, demo_body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
@@ -55,8 +57,12 @@ async def store_call(method, *args):
     return method(*args)
 
 
-APP_VERSION = "1.2.1"
+demo_quota = DemoQuota(settings.demo_daily_limit, settings.demo_minute_limit,
+                       store.client if isinstance(store, FirestoreResponseStore) else None)
+
+APP_VERSION = "1.3.0"
 app = FastAPI(title="Carlos Alonso · CV Agent", version=APP_VERSION, docs_url="/docs")
+app.mount("/assets", StaticFiles(directory=ROOT / "web"), name="assets")
 if settings.cors_origins:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins),
                        allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "X-API-Key"])
@@ -77,9 +83,9 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["X-Frame-Options"] = "DENY"
-    if request.url.path.startswith("/v1/"):
+    if request.url.path.startswith(("/v1/", "/demo/chat")):
         response.headers["Cache-Control"] = "no-store"
-    if request.url.path == "/":
+    if request.url.path in ("/", "/demo", "/chat"):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
             "connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
@@ -135,6 +141,12 @@ def _readiness_reasons() -> list[str]:
 
 # ------------------------------------------------------------------ rutas informativas
 @app.get("/")
+@app.get("/demo")
+def demo_page():
+    return FileResponse(ROOT / "web" / "demo.html")
+
+
+@app.get("/chat")
 def home():
     page = ROOT / "web" / "index.html"
     if page.exists():
@@ -163,6 +175,9 @@ def health():
         "documents": len(agent.kb.docs),
         "chunks": len(agent.kb.chunks),
         "auth_required": bool(settings.agent_api_key),
+        "demo_enabled": settings.demo_enabled,
+        "demo_daily_limit": settings.demo_daily_limit,
+        "demo_minute_limit": settings.demo_minute_limit,
     }
 
 
@@ -262,11 +277,36 @@ async def get_response(resp_id: str, request: Request):
 async def create_response(request: Request):
     if (err := _check_auth(request)) or (err := _check_rate(request)):
         return err
+    return await _create_response(request)
+
+
+@app.post("/demo/chat")
+async def demo_chat(request: Request):
+    if not settings.demo_enabled:
+        return JSONResponse(error_body("La demo no está habilitada", code="demo_disabled"), status_code=503)
+    if (err := _check_rate(request)):
+        return err
+    body = await _read_body(request, 20000)
+    if isinstance(body, JSONResponse):
+        return body
+    try:
+        body = demo_body(body)
+    except ValueError as exc:
+        return JSONResponse(error_body(str(exc)), status_code=400)
+    try:
+        await asyncio.to_thread(demo_quota.consume)
+    except DemoLimit as exc:
+        return JSONResponse(error_body("El cupo compartido de la demo se agotó. Intenta más tarde.", code="demo_limit"),
+                            status_code=429, headers={"Retry-After": str(exc.retry_after)})
+    return await _create_response(request, body)
+
+
+async def _read_body(request: Request, limit: int):
     if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
         return JSONResponse(error_body("Content-Type debe ser application/json"), status_code=415)
     raw_body = bytearray()
     async for chunk in request.stream():
-        if len(raw_body) + len(chunk) > settings.max_request_bytes:
+        if len(raw_body) + len(chunk) > limit:
             return JSONResponse(error_body("El cuerpo de la solicitud es demasiado grande", code="request_too_large"), status_code=413)
         raw_body.extend(chunk)
     try:
@@ -275,6 +315,14 @@ async def create_response(request: Request):
         # ValueError incluye JSON/Unicode inválido y enteros que exceden el
         # límite de conversión de Python; no reflejar detalles del cuerpo.
         return JSONResponse(error_body("JSON inválido"), status_code=400)
+    return body
+
+
+async def _create_response(request: Request, body=None):
+    if body is None:
+        body = await _read_body(request, settings.max_request_bytes)
+        if isinstance(body, JSONResponse):
+            return body
     try:
         body = validate_body(body)
     except InvalidRequest as e:
