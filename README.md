@@ -6,7 +6,7 @@ Agente de CV para el **Reto IA Banorte — Especialista Sr. de Inteligencia Arti
 
 **[Abrir demostración guiada y chat sin clave](https://carlos-cv-agent-c7eqmk6ara-uc.a.run.app/demo)** · Arquitectura, decisiones, capturas, validación, operación y propuesta de valor.
 
-![Respuesta real de Gemini en la demo](web/captures/chat.png)
+![Respuesta real de Gemini en la demo](web/captures/chat.jpg)
 
 ## Estado de la entrega
 

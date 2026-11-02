@@ -2,6 +2,7 @@
 
 ## Demo web 1.3.0 · 2 de noviembre de 2026
 
+- CI del commit `854e22909d4338a901deb61464be464ab06262f0`: [ejecución exitosa](https://github.com/Aloner23/cv-agent-banorte/actions/runs/41541536054), pruebas y construcción/prueba del contenedor.
 - **206 pruebas técnicas aprobadas** localmente con Python 3.12; proveedor simulado. Incluyen 20 casos nuevos para la demo pública: autenticación de la API preservada, acceso sin credencial a la demo, ausencia de persistencia, campos privilegiados rechazados, límites, cuota concurrente y cierre ante fallo del contador.
 - Respuesta real de PGMM en el nuevo chat local y conversación de perfil en la plataforma del reto sobre el Cloud Run anterior. Capturas y alcance en [DEMO_WEB.md](DEMO_WEB.md).
 - Lote completo anterior: 38 casos, 40 llamadas al agente y 38 al juez, versión 1.2.1, prompt `d3ff749428a6`, corpus `cac6e7ff0fa8`. 38 reglas aprobadas, cero errores de servicio; p50 0.95 s, p95 1.34 s en ese lote, no SLO.

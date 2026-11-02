@@ -25,7 +25,7 @@ DEMO_ENABLED=true LLM_PROVIDER=mock uvicorn app.main:app --port 8000
 python -m pytest -q
 ```
 
-La interfaz identifica el modo simulado. Para una conversación real, cargar la configuración de Gemini por entorno. Las capturas en `web/captures/` muestran conversaciones reales del 2 de noviembre de 2026: `chat.png` corresponde a la demo local conectada con Gemini; `platform.png`, al cliente del reto conectado con Cloud Run 1.2.1 antes de publicar la demo. No son conversaciones prefabricadas ni evidencia de que ambas superficies tengan la misma revisión.
+La interfaz identifica el modo simulado. Para una conversación real, cargar la configuración de Gemini por entorno. Las capturas en `web/captures/` muestran conversaciones reales del 2 de noviembre de 2026: `chat.jpg` corresponde a la demo local conectada con Gemini; `platform.jpg`, al cliente del reto conectado con Cloud Run 1.2.1 antes de publicar la demo. No son conversaciones prefabricadas ni evidencia de que ambas superficies tengan la misma revisión.
 
 La revisión móvil se realiza a 390 px y la de escritorio con el tamaño de navegador disponible. Pruebas de seguridad y cuota en `tests/test_demo.py`; evidencia adicional en [VALIDACION.md](VALIDACION.md).
 
