@@ -233,13 +233,13 @@ La demo presenta estos cambios con evidencia y alternativas pendientes. Las fech
 
 [Ver resultados históricos y actuales](../docs/VALIDACION.md).
 
-### 2 NOV · EXPERIENCIA DE EVALUACIÓN · De pedir la clave a una demo pública limitada
+### 2 NOV · EXPERIENCIA DE EVALUACIÓN · Acceso según el canal: integración y demostración
 
-**Antes.** El chat técnico requería introducir la clave del agente.
+**Necesidad de integración.** La API autenticada resuelve la conexión entre servicios y permite controlar el acceso a las respuestas almacenadas.
 
-**Hallazgo.** El evaluador necesitaba probarlo con un enlace. Insertar el secreto en JavaScript lo expondría a cualquier visitante.
+**Necesidad de demostración.** La evaluación mediante navegador requiere un acceso sencillo con límites propios. La integración y la demo necesitan políticas de acceso y retención diferentes.
 
-**Cambio y razón técnica.** Se creó /demo/chat con contrato reducido, store=false y cupo atómico compartido en Firestore. Reutiliza el núcleo; la integración de Banorte conserva su autenticación.
+**Cambio y razón técnica.** Se añadió un canal de demostración con contrato reducido, store=false y cupo atómico en Firestore. Ambos canales reutilizan el núcleo del agente. Las credenciales de la integración permanecen en el servidor.
 
 **Comprobación.** 206 pruebas técnicas, incluidos 20 casos de la demo. En producción: conversación y seguimiento sin clave; API protegida con 401 cuando falta la credencial.
 
