@@ -1,6 +1,6 @@
 # Demostración guiada y acceso sin clave
 
-La página `/` (también `/demo`) explica el problema, permite conversar, muestra capturas reales y desarrolla arquitectura, decisiones, evaluación, operación y una hipótesis de producto. No requiere login ni pegar una clave. El botón «Guardar como PDF» usa la impresión del navegador como respaldo del recorrido.
+La página `/` (también `/demo`) explica el problema, permite conversar, muestra capturas reales y desarrolla arquitectura, evolución de decisiones, mejoras propuestas, evaluación, operación y una hipótesis de producto. No requiere login ni pegar una clave. El botón «Guardar como PDF» usa la impresión del navegador como respaldo del recorrido.
 
 ## Acceso separado de la integración
 
@@ -30,3 +30,7 @@ La interfaz identifica el modo simulado. Para una conversación real, cargar la 
 La revisión móvil se realiza a 390 px y la de escritorio con el tamaño de navegador disponible. Pruebas de seguridad y cuota en `tests/test_demo.py`; evidencia adicional en [VALIDACION.md](VALIDACION.md).
 
 Referencias de implementación: [transacciones de Firestore](https://firebase.google.com/docs/firestore/manage-data/transactions), [cliente Python 2.34.1](https://docs.cloud.google.com/python/docs/reference/firestore/latest/google.cloud.firestore_v1.transaction.Transaction), [límites de instancias Cloud Run](https://docs.cloud.google.com/run/docs/configuring/max-instances-limits).
+
+## Recorrido de decisiones
+
+La sección 03 muestra seis cambios documentados, con antes, hallazgo, razón técnica, comprobación, límite y mejora siguiente. Los detalles nativos se abren con teclado y al imprimir se despliegan todos, restaurándose después. Se separan decisiones conservadas y tres prioridades futuras: fidelidad, operación y piloto autorizado. El recorrido estimado es de 8–10 minutos; profundizar en todas las evidencias toma más tiempo. La cronología completa está en [Decisiones técnicas](DECISIONES_TECNICAS.md#14-evolución-documentada-de-las-decisiones).

@@ -148,3 +148,111 @@ La entrega se considera lista cuando el perfil esté cotejado y autorizado, las 
 ## 13. Demo pública sin distribuir credenciales
 
 La ruta `/demo/chat` comparte el núcleo del agente, pero tiene contrato, cuota y retención propios. No inyecta un secreto en JavaScript ni expone el historial de la integración. Firestore reserva de forma atómica el cupo global; un fallo del contador cierra el acceso a generación. Es una elección de demostración: reduce fricción con costo acotado por solicitudes, pero acepta que un tercero pueda agotar el cupo. No sustituye identidad individual, permisos ni protección de borde. [Detalles y límites](DEMO_WEB.md).
+
+## 14. Evolución documentada de las decisiones
+
+La demo presenta estos cambios con evidencia y alternativas pendientes. Las fechas identifican iteraciones; no prueban superioridad causal de una arquitectura.
+
+### 30 OCT · CONTROLES · Del prompt a controles también en el servidor
+
+**Antes.** Reglas de identidad en el prompt y un juez LLM que aprobó una respuesta con tono de pirata.
+
+**Hallazgo.** Añadir un recordatorio no corrigió ese caso: la respuesta negaba el cambio de rol, pero lo imitaba.
+
+**Cambio y razón técnica.** Se añadió una regla acotada para rechazar cambios directos de identidad al inicio del mensaje, antes de consultar Gemini. Lo verificable se impone en código.
+
+**Comprobación.** Se repitieron tres casos de inyección y se revisaron sus cuatro respuestas. El caso de cambio directo de rol ya no consume tokens del proveedor.
+
+**Límite.** La regla puede rechazar frases legítimas y no detecta todas las variantes de inyección.
+
+**Mejora propuesta.** Ampliar paráfrasis adversarias y ejemplos benignos; medir ataques que pasan y consultas válidas que se bloquean.
+
+[Ver la comprobación y sus límites](../docs/RESULTADOS_INYECCION.md).
+
+### 30 OCT · INTEGRACIÓN · Del contrato aislado al cliente real de Banorte
+
+**Antes.** Validación estricta de parámetros y referencias como [perfil] visibles en el texto.
+
+**Hallazgo.** El cliente enviaba opciones que provocaban rechazos innecesarios; las referencias técnicas interrumpían la lectura.
+
+**Cambio y razón técnica.** Se aceptan y registran opciones inocuas no aplicables, conservando el rechazo de funciones no implementadas. Las fuentes viajan como anotaciones; la demo las pide visibles.
+
+**Comprobación.** Pruebas de contrato y conversaciones en la plataforma. JSON y SSE comparten el núcleo; el stream tiene eventos en secuencia y cierre terminal.
+
+**Límite.** Aceptar un campo no significa ejecutar su función. La compatibilidad verificada es textual, no toda la especificación.
+
+**Mejora propuesta.** Mantener casos capturados del cliente como regresiones y probar de nuevo al cambiar el protocolo o el proveedor.
+
+[Ver criterios de compatibilidad](../docs/DECISIONES_TECNICAS.md#12-interoperabilidad-contenedor-y-observabilidad-iteración-del-30-de-octubre).
+
+### 30 OCT · DESPLIEGUE Y ESTADO · De Render y memoria local a Cloud Run y Firestore
+
+**Antes.** Primer despliegue público en Render, con historial asociado al proceso.
+
+**Hallazgo.** El objetivo pasó a demostrar contenedores, operación serverless y observabilidad integrada. Un proceso que reinicia no puede ser el dueño de la conversación.
+
+**Cambio y razón técnica.** Contenedor sin privilegios en Cloud Run; estado temporal fuera del proceso en Firestore, secretos en Secret Manager y telemetría en Logging/Monitoring.
+
+**Comprobación.** Una respuesta creada en la revisión 00002 se continuó por SSE en la 00003. Se comprobó expiración lógica y la política TTL activa.
+
+**Límite.** Hay arranques en frío y costo de base de datos; la eliminación física por TTL es asíncrona. Render se conserva como respaldo, sin equivalencia de estado.
+
+**Mejora propuesta.** Medir latencia con arranque en frío y concurrencia, ensayar rollback y conectar la alerta operativa a un canal atendido.
+
+[Ver prueba entre revisiones](../docs/VALIDACION.md#cloud-run--versión-120).
+
+### 31 OCT · PRECISIÓN DE LOS FILTROS · De ocultar números a preservar enlaces autorizados
+
+**Antes.** Un filtro para teléfonos también podía ocultar el número de proyecto dentro de una URL legítima de Cloud Run.
+
+**Hallazgo.** La propia dirección pública de la solución quedaba dañada por un control de privacidad demasiado amplio.
+
+**Cambio y razón técnica.** Se preservan enlaces públicos del corpus y se documenta una URL alternativa. Se conserva el filtro de privacidad para los demás casos.
+
+**Comprobación.** Se añadió una regresión que preserva el enlace incluso cuando el streaming lo entrega carácter por carácter.
+
+**Límite.** Una expresión regular no es un sistema general de prevención de fugas; cada excepción necesita un alcance explícito.
+
+**Mejora propuesta.** Ampliar ejemplos de URLs, cifras de negocio y formatos de teléfono; revisar tanto filtrados excesivos como datos que escapen.
+
+[Ver cambio y prueba de regresión](https://github.com/Aloner23/cv-agent-banorte/commit/aaa4863).
+
+### 2 NOV · CALIDAD · Del resultado automático a revisar errores concretos
+
+**Antes.** Las reglas y el juez aprobaron 38 casos de la versión 1.2.1.
+
+**Hallazgo.** La lectura humana encontró una cifra mal escrita en inglés y una atribución ambigua entre empleadores. El juez era el mismo modelo.
+
+**Cambio y razón técnica.** Se reforzaron precisión numérica, idioma y continuidad en el prompt, y se estructuró la evidencia de Ingenico. Los resultados se vinculan a su versión de prompt y corpus.
+
+**Comprobación.** En seis respuestas dirigidas se recuperaron las cifras y Power BI en Ingenico. Persistieron detalle adicional y una formulación ambigua sobre herramientas.
+
+**Límite.** Ese lote dirigido no sustituye repetir los 38 casos ni demuestra que todos los defectos estén resueltos.
+
+**Mejora propuesta.** Repetir el conjunto completo, revisar atribución frase por frase y calibrar un juez distinto contra una muestra evaluada por personas.
+
+[Ver resultados históricos y actuales](../docs/VALIDACION.md).
+
+### 2 NOV · EXPERIENCIA DE EVALUACIÓN · De pedir la clave a una demo pública limitada
+
+**Antes.** El chat técnico requería introducir la clave del agente.
+
+**Hallazgo.** El evaluador necesitaba probarlo con un enlace. Insertar el secreto en JavaScript lo expondría a cualquier visitante.
+
+**Cambio y razón técnica.** Se creó /demo/chat con contrato reducido, store=false y cupo atómico compartido en Firestore. Reutiliza el núcleo; la integración de Banorte conserva su autenticación.
+
+**Comprobación.** 206 pruebas técnicas, incluidos 20 casos de la demo. En producción: conversación y seguimiento sin clave; API protegida con 401 cuando falta la credencial.
+
+**Límite.** Un visitante puede agotar el cupo compartido. Los límites de solicitudes y las alertas de presupuesto no garantizan un tope de gasto.
+
+**Mejora propuesta.** Para un piloto interno: identidad corporativa, cuotas por persona y pruebas de aislamiento antes de incorporar perfiles adicionales.
+
+[Ver acceso, cuota y retención](../docs/DEMO_WEB.md).
+
+### Prioridad y condición de avance
+
+1. **Fidelidad:** repetir los 38 casos con el prompt actual y revisar cifras, atribución y seguimientos. Criterio propuesto: ningún error crítico de cifra, credencial o empleador en el conjunto revisado; registrar desacuerdos del juez sin extrapolar esa aprobación.
+2. **Operación:** medir concurrencia, arranque en frío, errores y costo; ensayar rollback y notificaciones. Conservar continuidad y cuota compartida ante esos escenarios. Definir SLO después de medir, no con una consulta rápida aislada.
+3. **Piloto:** SSO, permisos por documento, consentimiento y pruebas de aislamiento antes de ampliar perfiles. Comparar recuperación sólo si el corpus/costo lo exige, con el mismo conjunto de preguntas y medidas de recall, fidelidad, latencia y costo.
+
+Se conservaron Gemini, contexto completo y flujo acotado. No se presenta una migración ficticia desde una base vectorial ni una comparación de proveedores que no se ejecutó. Estas mejoras están propuestas; no se declaran implementadas.
